@@ -1,7 +1,9 @@
 use std::io::{Seek, Write};
 
 use crate::mp4box::*;
+use crate::mvex::MvexBox;
 use crate::track::Mp4TrackWriter;
+use crate::trex::TrexBox;
 use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,7 +87,21 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
     }
 
     pub fn write_end(&mut self) -> Result<()> {
-        let mut moov = MoovBox::default();
+        let mut moov = MoovBox {
+            mvex: Some(MvexBox {
+                mehd: None,
+                trex: TrexBox {
+                    version: 0,
+                    flags: 0,
+                    track_id: 1,
+                    default_sample_description_index: 1,
+                    default_sample_duration: 0,
+                    default_sample_size: 0,
+                    default_sample_flags: 0,
+                },
+            }),
+            ..MoovBox::default()
+        };
 
         for track in self.tracks.iter_mut() {
             moov.traks.push(track.write_end(&mut self.writer)?);
