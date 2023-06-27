@@ -31,8 +31,16 @@ impl TrunBox {
     pub const FLAG_SAMPLE_FLAGS: u32 = 0x400;
     pub const FLAG_SAMPLE_CTS: u32 = 0x800;
 
+    pub const FLAG_SAMPLE_FLAG_IS_NON_SYNC: u32 = 0x00010000;
+    pub const FLAG_SAMPLE_DEPENDS_NO: u32 = 0x02000000;
+    pub const FLAG_SAMPLE_DEPENDS_YES: u32 = 0x01000000;
+
     pub fn get_type(&self) -> BoxType {
         BoxType::TrunBox
+    }
+
+    pub fn duration(&self) -> u32 {
+        self.sample_durations.iter().sum()
     }
 
     pub fn get_size(&self) -> u64 {

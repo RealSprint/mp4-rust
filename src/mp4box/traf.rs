@@ -105,6 +105,10 @@ impl<W: Write> WriteBox<&mut W> for TrafBox {
 
         self.tfhd.write_box(writer)?;
 
+        for trun in self.trun.iter() {
+            trun.write_box(writer)?;
+        }
+
         Ok(size)
     }
 }
