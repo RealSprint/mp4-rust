@@ -107,6 +107,7 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
             moov.traks.push(track.write_end(&mut self.writer)?);
         }
 
+        moov.mvhd.next_track_id = 2;
         moov.mvhd.timescale = self.timescale;
         moov.mvhd.duration = self.duration;
         if moov.mvhd.duration > (u32::MAX as u64) {
