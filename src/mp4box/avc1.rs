@@ -68,7 +68,17 @@ impl Avc1Box {
     }
 
     pub fn get_size(&self) -> u64 {
-        HEADER_SIZE + 8 + 70 + self.avcc.box_size()
+        let mut size = HEADER_SIZE + 8 + 70 + self.avcc.box_size();
+
+        if let Some(colr) = &self.colr {
+            size += colr.box_size();
+        }
+
+        if let Some(pasp) = &self.pasp {
+            size += pasp.box_size();
+        }
+
+        size
     }
 }
 
@@ -169,6 +179,14 @@ impl<W: Write> WriteBox<&mut W> for Avc1Box {
         writer.write_i16::<BigEndian>(-1)?; // pre-defined
 
         self.avcc.write_box(writer)?;
+
+        if let Some(colr) = &self.colr {
+            colr.write_box(writer)?;
+        }
+
+        if let Some(pasp) = &self.pasp {
+            pasp.write_box(writer)?;
+        }
 
         Ok(size)
     }
