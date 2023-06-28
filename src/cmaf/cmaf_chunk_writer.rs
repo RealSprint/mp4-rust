@@ -142,6 +142,29 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         Duration::ZERO
     }
 
+    pub fn base_media_decode_time(&self) -> u64 {
+        if let Some(ref tfdt) = self.traf.tfdt {
+            return tfdt.base_media_decode_time;
+        }
+
+        0
+    }
+
+    pub fn starts_with_keyframe(&self) -> bool {
+        let Some(ref trun ) = self.traf.trun else {
+            return false;
+        };
+
+        if let Some(first_sample_flags) = trun
+            .first_sample_flags
+            .or(trun.sample_flags.first().cloned())
+        {
+            return first_sample_flags & TrunBox::FLAG_SAMPLE_DEPENDS_NO > 0;
+        }
+
+        false
+    }
+
     fn sample_trun_flags(sample: &Mp4Sample) -> u32 {
         if sample.is_sync {
             TrunBox::FLAG_SAMPLE_DEPENDS_NO
