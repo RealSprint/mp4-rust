@@ -154,6 +154,13 @@ mod tests {
                 ]
                 .to_vec(),
                 pic_param_set: [104, 206, 60, 128].to_vec(),
+                color: Some(ColorConfig {
+                    color_primaries: 1,
+                    transfer_characteristics: 1,
+                    matrix_coefficients: 1,
+                    full_range: false,
+                }),
+                aspect_ratio: Some((1, 1)),
             }),
         })?;
 

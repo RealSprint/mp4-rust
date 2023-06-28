@@ -64,6 +64,7 @@ use crate::*;
 
 pub(crate) mod avc1;
 pub(crate) mod co64;
+pub(crate) mod colr;
 pub(crate) mod ctts;
 pub(crate) mod data;
 pub(crate) mod dinf;
@@ -85,6 +86,7 @@ pub(crate) mod moov;
 pub(crate) mod mp4a;
 pub(crate) mod mvex;
 pub(crate) mod mvhd;
+pub(crate) mod pasp;
 pub(crate) mod smhd;
 pub(crate) mod stbl;
 pub(crate) mod stco;
@@ -174,6 +176,8 @@ boxtype! {
     StszBox => 0x7374737A,
     StcoBox => 0x7374636F,
     Co64Box => 0x636F3634,
+    ColrBox => 0x636F6C72,
+    PaspBox => 0x70617370,
     TrakBox => 0x7472616b,
     TrafBox => 0x74726166,
     TrunBox => 0x7472756E,

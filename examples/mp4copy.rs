@@ -49,6 +49,8 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
                 height: track.height(),
                 seq_param_set: track.sequence_parameter_set()?.to_vec(),
                 pic_param_set: track.picture_parameter_set()?.to_vec(),
+                color: None,
+                aspect_ratio: None,
             }),
             MediaType::H265 => MediaConfig::HevcConfig(HevcConfig {
                 width: track.width(),

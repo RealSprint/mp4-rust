@@ -2,7 +2,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
 
-use crate::mp4box::*;
+use crate::{colr::ColrBox, mp4box::*, pasp::PaspBox};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Avc1Box {
@@ -18,6 +18,8 @@ pub struct Avc1Box {
     pub frame_count: u16,
     pub depth: u16,
     pub avcc: AvcCBox,
+    pub colr: Option<ColrBox>,
+    pub pasp: Option<PaspBox>,
 }
 
 impl Default for Avc1Box {
@@ -31,6 +33,8 @@ impl Default for Avc1Box {
             frame_count: 1,
             depth: 0x0018,
             avcc: AvcCBox::default(),
+            colr: None,
+            pasp: None,
         }
     }
 }
@@ -46,6 +50,16 @@ impl Avc1Box {
             frame_count: 1,
             depth: 0x0018,
             avcc: AvcCBox::new(&config.seq_param_set, &config.pic_param_set),
+            colr: config.color.as_ref().map(|color| ColrBox {
+                color_config: colr::Color::Nclx(color.clone()),
+            }),
+            pasp: config
+                .aspect_ratio
+                .as_ref()
+                .map(|(numerator, denumerator)| PaspBox {
+                    numerator: *numerator,
+                    denumerator: *denumerator,
+                }),
         }
     }
 
@@ -122,6 +136,8 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
                 frame_count,
                 depth,
                 avcc,
+                colr: None, // TODO: Read the colr
+                pasp: None, // TODO: Read the pasp
             })
         } else {
             Err(Error::InvalidData("avcc not found"))
@@ -331,6 +347,8 @@ mod tests {
                     bytes: vec![0x68, 0xEB, 0xE3, 0xCB, 0x22, 0xC0],
                 }],
             },
+            colr: None,
+            pasp: None,
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();

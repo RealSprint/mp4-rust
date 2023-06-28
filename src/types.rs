@@ -564,12 +564,22 @@ impl fmt::Display for ChannelConfig {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Default)]
+pub struct ColorConfig {
+    pub color_primaries: u16,
+    pub transfer_characteristics: u16,
+    pub matrix_coefficients: u16,
+    pub full_range: bool,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct AvcConfig {
     pub width: u16,
     pub height: u16,
     pub seq_param_set: Vec<u8>,
     pub pic_param_set: Vec<u8>,
+    pub color: Option<ColorConfig>,
+    pub aspect_ratio: Option<(u32, u32)>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
