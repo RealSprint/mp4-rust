@@ -503,6 +503,25 @@ impl TryFrom<u8> for SampleFreqIndex {
 }
 
 impl SampleFreqIndex {
+    pub fn try_from_frequency(frequency: u32) -> Result<SampleFreqIndex> {
+        Ok(match frequency {
+            96000 => SampleFreqIndex::Freq96000,
+            88200 => SampleFreqIndex::Freq88200,
+            64000 => SampleFreqIndex::Freq64000,
+            48000 => SampleFreqIndex::Freq48000,
+            44100 => SampleFreqIndex::Freq44100,
+            32000 => SampleFreqIndex::Freq32000,
+            24000 => SampleFreqIndex::Freq24000,
+            22050 => SampleFreqIndex::Freq22050,
+            16000 => SampleFreqIndex::Freq16000,
+            12000 => SampleFreqIndex::Freq12000,
+            11025 => SampleFreqIndex::Freq11025,
+            8000 => SampleFreqIndex::Freq8000,
+            7350 => SampleFreqIndex::Freq7350,
+            _ => return Err(Error::InvalidData("invalid sampling frequency index")),
+        })
+    }
+
     pub fn freq(&self) -> u32 {
         match *self {
             SampleFreqIndex::Freq96000 => 96000,
