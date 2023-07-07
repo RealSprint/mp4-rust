@@ -165,6 +165,16 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         false
     }
 
+    pub fn contains_keyframe(&self) -> bool {
+        let Some(ref trun ) = self.traf.trun else {
+            return false;
+        };
+
+        trun.sample_flags
+            .iter()
+            .any(|flags| flags & TrunBox::FLAG_SAMPLE_DEPENDS_NO > 0)
+    }
+
     fn sample_trun_flags(sample: &Mp4Sample) -> u32 {
         if sample.is_sync {
             TrunBox::FLAG_SAMPLE_DEPENDS_NO
