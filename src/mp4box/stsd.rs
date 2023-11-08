@@ -159,8 +159,12 @@ impl<W: Write> WriteBox<&mut W> for StsdBox {
             hev1.write_box(writer)?;
         } else if let Some(ref vp09) = self.vp09 {
             vp09.write_box(writer)?;
+        } else if let Some(ref av01) = self.av01 {
+            av01.write_box(writer)?;
         } else if let Some(ref mp4a) = self.mp4a {
             mp4a.write_box(writer)?;
+        } else if let Some(ref opus) = self.opus {
+            opus.write_box(writer)?;
         } else if let Some(ref tx3g) = self.tx3g {
             tx3g.write_box(writer)?;
         }
