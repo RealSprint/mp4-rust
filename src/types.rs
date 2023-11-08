@@ -4,6 +4,7 @@ use std::convert::TryFrom;
 use std::fmt;
 
 use crate::mp4box::*;
+use crate::opus::ChannelMappingFamily;
 use crate::*;
 
 pub use bytes::Bytes;
@@ -220,15 +221,19 @@ impl From<TrackType> for FourCC {
 const MEDIA_TYPE_H264: &str = "h264";
 const MEDIA_TYPE_H265: &str = "h265";
 const MEDIA_TYPE_VP9: &str = "vp9";
+const MEDIA_TYPE_AV1: &str = "av1";
 const MEDIA_TYPE_AAC: &str = "aac";
+const MEDIA_TYPE_OPUS: &str = "opus";
 const MEDIA_TYPE_TTXT: &str = "ttxt";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MediaType {
     H264,
     H265,
+    AV1,
     VP9,
     AAC,
+    OPUS,
     TTXT,
 }
 
@@ -246,7 +251,9 @@ impl TryFrom<&str> for MediaType {
             MEDIA_TYPE_H264 => Ok(MediaType::H264),
             MEDIA_TYPE_H265 => Ok(MediaType::H265),
             MEDIA_TYPE_VP9 => Ok(MediaType::VP9),
+            MEDIA_TYPE_AV1 => Ok(MediaType::AV1),
             MEDIA_TYPE_AAC => Ok(MediaType::AAC),
+            MEDIA_TYPE_OPUS => Ok(MediaType::OPUS),
             MEDIA_TYPE_TTXT => Ok(MediaType::TTXT),
             _ => Err(Error::InvalidData("unsupported media type")),
         }
@@ -259,7 +266,9 @@ impl From<MediaType> for &str {
             MediaType::H264 => MEDIA_TYPE_H264,
             MediaType::H265 => MEDIA_TYPE_H265,
             MediaType::VP9 => MEDIA_TYPE_VP9,
+            MediaType::AV1 => MEDIA_TYPE_AV1,
             MediaType::AAC => MEDIA_TYPE_AAC,
+            MediaType::OPUS => MEDIA_TYPE_OPUS,
             MediaType::TTXT => MEDIA_TYPE_TTXT,
         }
     }
@@ -270,8 +279,10 @@ impl From<&MediaType> for &str {
         match t {
             MediaType::H264 => MEDIA_TYPE_H264,
             MediaType::H265 => MEDIA_TYPE_H265,
+            MediaType::AV1 => MEDIA_TYPE_AV1,
             MediaType::VP9 => MEDIA_TYPE_VP9,
             MediaType::AAC => MEDIA_TYPE_AAC,
+            MediaType::OPUS => MEDIA_TYPE_OPUS,
             MediaType::TTXT => MEDIA_TYPE_TTXT,
         }
     }
@@ -613,6 +624,24 @@ pub struct Vp9Config {
     pub height: u16,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
+pub struct Av1Config {
+    pub width: u16,
+    pub height: u16,
+    pub color: Option<ColorConfig>,
+    pub aspect_ratio: Option<(u32, u32)>,
+    pub sequence_header: Vec<u8>,
+    pub tier: u8,
+    pub profile: u8,
+    pub level_idx: u8,
+    pub bit_depth: u8,
+    pub monochrome: bool,
+    pub subsampling_x: u8,
+    pub subsampling_y: u8,
+    pub chroma_sample_position: u8,
+    pub initial_presentation_delay_minus_one: Option<u8>,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AacConfig {
     pub bitrate: u32,
@@ -632,6 +661,15 @@ impl Default for AacConfig {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct OpusConfig {
+    pub bitrate: u32,
+    pub pre_skip: u16,
+    pub sample_rate: u32,
+    pub output_gain: i16,
+    pub channel_mapping_family: ChannelMappingFamily,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct TtxtConfig {}
 
@@ -640,6 +678,8 @@ pub enum MediaConfig {
     AvcConfig(AvcConfig),
     HevcConfig(HevcConfig),
     Vp9Config(Vp9Config),
+    Av1Config(Av1Config),
+    OpusConfig(OpusConfig),
     AacConfig(AacConfig),
     TtxtConfig(TtxtConfig),
 }

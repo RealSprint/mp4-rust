@@ -5,8 +5,8 @@ use std::io::{self, BufReader, BufWriter};
 use std::path::Path;
 
 use mp4::{
-    AacConfig, AvcConfig, HevcConfig, MediaConfig, MediaType, Mp4Config, Result, TrackConfig,
-    TtxtConfig, Vp9Config,
+    AacConfig, Av1Config, AvcConfig, HevcConfig, MediaConfig, MediaType, Mp4Config, Result,
+    TrackConfig, TtxtConfig, Vp9Config,
 };
 
 fn main() {
@@ -67,6 +67,8 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
                 chan_conf: track.channel_config()?,
             }),
             MediaType::TTXT => MediaConfig::TtxtConfig(TtxtConfig {}),
+            MediaType::AV1 => todo!(),
+            MediaType::OPUS => todo!(),
         };
 
         let track_conf = TrackConfig {

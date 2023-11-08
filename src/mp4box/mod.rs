@@ -62,6 +62,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 use crate::*;
 
+pub(crate) mod av01;
 pub(crate) mod avc1;
 pub(crate) mod co64;
 pub(crate) mod colr;
@@ -86,6 +87,7 @@ pub(crate) mod moov;
 pub(crate) mod mp4a;
 pub(crate) mod mvex;
 pub(crate) mod mvhd;
+pub(crate) mod opus;
 pub(crate) mod pasp;
 pub(crate) mod smhd;
 pub(crate) mod stbl;
@@ -227,11 +229,15 @@ boxtype! {
     UrlBox  => 0x75726C20,
     SmhdBox => 0x736d6864,
     Avc1Box => 0x61766331,
+    Av01Box => 0x61763031,
     AvcCBox => 0x61766343,
+    Av1CBox => 0x61763143,
     Hev1Box => 0x68657631,
     HvcCBox => 0x68766343,
     Mp4aBox => 0x6d703461,
     EsdsBox => 0x65736473,
+    DopsBox => 0x644F7073,
+    OpusBox => 0x4F707573,
     Tx3gBox => 0x74783367,
     VpccBox => 0x76706343,
     Vp09Box => 0x76703039,
