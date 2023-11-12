@@ -52,6 +52,8 @@ impl StsdBox {
             size += av01.box_size();
         } else if let Some(ref mp4a) = self.mp4a {
             size += mp4a.box_size();
+        } else if let Some(ref opus) = self.opus {
+            size += opus.box_size();
         } else if let Some(ref tx3g) = self.tx3g {
             size += tx3g.box_size();
         }
