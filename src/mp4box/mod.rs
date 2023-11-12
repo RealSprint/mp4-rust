@@ -87,7 +87,7 @@ pub(crate) mod moov;
 pub(crate) mod mp4a;
 pub(crate) mod mvex;
 pub(crate) mod mvhd;
-pub(crate) mod opus;
+pub mod opus;
 pub(crate) mod pasp;
 pub(crate) mod smhd;
 pub(crate) mod stbl;
