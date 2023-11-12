@@ -725,7 +725,7 @@ impl Mp4TrackWriter {
             }
             MediaConfig::Av1Config(ref config) => {
                 trak.tkhd.set_width(config.width);
-                trak.tkhd.set_width(config.height);
+                trak.tkhd.set_height(config.height);
 
                 trak.mdia.minf.stbl.stsd.av01 = Some(Av01Box::new(config));
             }
