@@ -2,9 +2,11 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
 
+use crate::av01::Av01Box;
 use crate::mp4box::vp09::Vp09Box;
 use crate::mp4box::*;
 use crate::mp4box::{avc1::Avc1Box, hev1::Hev1Box, mp4a::Mp4aBox, tx3g::Tx3gBox};
+use crate::opus::OpusBox;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct StsdBox {
@@ -21,7 +23,13 @@ pub struct StsdBox {
     pub vp09: Option<Vp09Box>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub av01: Option<Av01Box>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub mp4a: Option<Mp4aBox>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub opus: Option<OpusBox>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tx3g: Option<Tx3gBox>,
@@ -40,8 +48,12 @@ impl StsdBox {
             size += hev1.box_size();
         } else if let Some(ref vp09) = self.vp09 {
             size += vp09.box_size();
+        } else if let Some(ref av01) = self.av01 {
+            size += av01.box_size();
         } else if let Some(ref mp4a) = self.mp4a {
             size += mp4a.box_size();
+        } else if let Some(ref opus) = self.opus {
+            size += opus.box_size();
         } else if let Some(ref tx3g) = self.tx3g {
             size += tx3g.box_size();
         }
@@ -80,7 +92,9 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
         let mut hev1 = None;
         let mut vp09 = None;
         let mut mp4a = None;
+        let mut opus = None;
         let mut tx3g = None;
+        let mut av01 = None;
 
         // Get box header.
         let header = BoxHeader::read(reader)?;
@@ -101,8 +115,14 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
             BoxType::Vp09Box => {
                 vp09 = Some(Vp09Box::read_box(reader, s)?);
             }
+            BoxType::Av01Box => {
+                av01 = Some(Av01Box::read_box(reader, s)?);
+            }
             BoxType::Mp4aBox => {
                 mp4a = Some(Mp4aBox::read_box(reader, s)?);
+            }
+            BoxType::OpusBox => {
+                opus = Some(OpusBox::read_box(reader, s)?);
             }
             BoxType::Tx3gBox => {
                 tx3g = Some(Tx3gBox::read_box(reader, s)?);
@@ -118,7 +138,9 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
             avc1,
             hev1,
             vp09,
+            av01,
             mp4a,
+            opus,
             tx3g,
         })
     }
@@ -139,8 +161,12 @@ impl<W: Write> WriteBox<&mut W> for StsdBox {
             hev1.write_box(writer)?;
         } else if let Some(ref vp09) = self.vp09 {
             vp09.write_box(writer)?;
+        } else if let Some(ref av01) = self.av01 {
+            av01.write_box(writer)?;
         } else if let Some(ref mp4a) = self.mp4a {
             mp4a.write_box(writer)?;
+        } else if let Some(ref opus) = self.opus {
+            opus.write_box(writer)?;
         } else if let Some(ref tx3g) = self.tx3g {
             tx3g.write_box(writer)?;
         }

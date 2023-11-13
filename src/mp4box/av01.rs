@@ -5,7 +5,7 @@ use std::io::{Read, Seek, Write};
 use crate::{colr::ColrBox, mp4box::*, pasp::PaspBox};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Avc1Box {
+pub struct Av01Box {
     pub data_reference_index: u16,
     pub width: u16,
     pub height: u16,
@@ -17,14 +17,14 @@ pub struct Avc1Box {
     pub vertresolution: FixedPointU16,
     pub frame_count: u16,
     pub depth: u16,
-    pub avcc: AvcCBox,
+    pub av1c: Av1CBox,
     pub colr: Option<ColrBox>,
     pub pasp: Option<PaspBox>,
 }
 
-impl Default for Avc1Box {
+impl Default for Av01Box {
     fn default() -> Self {
-        Avc1Box {
+        Av01Box {
             data_reference_index: 0,
             width: 0,
             height: 0,
@@ -32,16 +32,16 @@ impl Default for Avc1Box {
             vertresolution: FixedPointU16::new(0x48),
             frame_count: 1,
             depth: 0x0018,
-            avcc: AvcCBox::default(),
+            av1c: Av1CBox::default(),
             colr: None,
             pasp: None,
         }
     }
 }
 
-impl Avc1Box {
-    pub fn new(config: &AvcConfig) -> Self {
-        Avc1Box {
+impl Av01Box {
+    pub fn new(config: &Av1Config) -> Self {
+        Av01Box {
             data_reference_index: 1,
             width: config.width,
             height: config.height,
@@ -49,7 +49,7 @@ impl Avc1Box {
             vertresolution: FixedPointU16::new(0x48),
             frame_count: 1,
             depth: 0x0018,
-            avcc: AvcCBox::new(&config.seq_param_set, &config.pic_param_set),
+            av1c: Av1CBox::new(config),
             colr: config.color.as_ref().map(|color| ColrBox {
                 color_config: colr::Color::Nclx(color.clone()),
             }),
@@ -64,11 +64,11 @@ impl Avc1Box {
     }
 
     pub fn get_type(&self) -> BoxType {
-        BoxType::Avc1Box
+        BoxType::Av01Box
     }
 
     pub fn get_size(&self) -> u64 {
-        let mut size = HEADER_SIZE + 8 + 70 + self.avcc.box_size();
+        let mut size = HEADER_SIZE + 8 + 70 + self.av1c.box_size();
 
         if let Some(colr) = &self.colr {
             size += colr.box_size();
@@ -82,7 +82,7 @@ impl Avc1Box {
     }
 }
 
-impl Mp4Box for Avc1Box {
+impl Mp4Box for Av01Box {
     fn box_type(&self) -> BoxType {
         self.get_type()
     }
@@ -104,7 +104,7 @@ impl Mp4Box for Avc1Box {
     }
 }
 
-impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
+impl<R: Read + Seek> ReadBox<&mut R> for Av01Box {
     fn read_box(reader: &mut R, size: u64) -> Result<Self> {
         let start = box_start(reader)?;
 
@@ -125,7 +125,8 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
         let depth = reader.read_u16::<BigEndian>()?;
         reader.read_i16::<BigEndian>()?; // pre-defined
 
-        let mut avcc = None;
+        //
+        let mut av1c = None;
         let mut colr = None;
         let mut pasp = None;
 
@@ -137,13 +138,13 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
             let BoxHeader { name, size: s } = header;
             if s > size {
                 return Err(Error::InvalidData(
-                    "avc1 box contains a box with a larger size than it",
+                    "av01 box contains a box with a larger size than it",
                 ));
             }
 
             match name {
-                BoxType::AvcCBox => {
-                    avcc = Some(AvcCBox::read_box(reader, s)?);
+                BoxType::Av1CBox => {
+                    av1c = Some(Av1CBox::read_box(reader, s)?);
                 }
                 BoxType::ColrBox => {
                     colr = Some(ColrBox::read_box(reader, s)?);
@@ -161,11 +162,11 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
 
         skip_bytes_to(reader, start + size)?;
 
-        let Some(avcc) = avcc else {
-            return Err(Error::InvalidData("avcc not found"));
+        let Some(av1c) = av1c else {
+            return Err(Error::InvalidData("av1c not found"));
         };
 
-        Ok(Avc1Box {
+        Ok(Av01Box {
             data_reference_index,
             width,
             height,
@@ -173,14 +174,14 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
             vertresolution,
             frame_count,
             depth,
-            avcc,
+            av1c,
             colr,
             pasp,
         })
     }
 }
 
-impl<W: Write> WriteBox<&mut W> for Avc1Box {
+impl<W: Write> WriteBox<&mut W> for Av01Box {
     fn write_box(&self, writer: &mut W) -> Result<u64> {
         let size = self.box_size();
         BoxHeader::new(self.box_type(), size).write(writer)?;
@@ -203,7 +204,7 @@ impl<W: Write> WriteBox<&mut W> for Avc1Box {
         writer.write_u16::<BigEndian>(self.depth)?;
         writer.write_i16::<BigEndian>(-1)?; // pre-defined
 
-        self.avcc.write_box(writer)?;
+        self.av1c.write_box(writer)?;
 
         if let Some(colr) = &self.colr {
             colr.write_box(writer)?;
@@ -218,43 +219,44 @@ impl<W: Write> WriteBox<&mut W> for Avc1Box {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-pub struct AvcCBox {
-    pub configuration_version: u8,
-    pub avc_profile_indication: u8,
-    pub profile_compatibility: u8,
-    pub avc_level_indication: u8,
-    pub length_size_minus_one: u8,
-    pub sequence_parameter_sets: Vec<NalUnit>,
-    pub picture_parameter_sets: Vec<NalUnit>,
+pub struct Av1CBox {
+    pub tier: u8,
+    pub profile: u8,
+    pub level_idx: u8,
+    pub bit_depth: u8,
+    pub monochrome: bool,
+    pub subsampling_x: u8,
+    pub subsampling_y: u8,
+    pub chroma_sample_position: u8,
+    pub initial_presentation_delay_minus_one: Option<u8>,
+    pub sequence_header: Vec<u8>,
 }
 
-impl AvcCBox {
-    pub fn new(sps: &[u8], pps: &[u8]) -> Self {
+impl Av1CBox {
+    pub fn new(config: &Av1Config) -> Self {
         Self {
-            configuration_version: 1,
-            avc_profile_indication: sps[1],
-            profile_compatibility: sps[2],
-            avc_level_indication: sps[3],
-            length_size_minus_one: 0xff, // length_size = 4
-            sequence_parameter_sets: vec![NalUnit::from(sps)],
-            picture_parameter_sets: vec![NalUnit::from(pps)],
+            tier: config.tier,
+            profile: config.profile,
+            level_idx: config.level_idx,
+            bit_depth: config.bit_depth,
+            monochrome: config.monochrome,
+            subsampling_x: config.subsampling_x,
+            subsampling_y: config.subsampling_y,
+            chroma_sample_position: config.chroma_sample_position,
+            sequence_header: config.sequence_header.clone(),
+            initial_presentation_delay_minus_one: config.initial_presentation_delay_minus_one,
         }
     }
 }
 
-impl Mp4Box for AvcCBox {
+impl Mp4Box for Av1CBox {
     fn box_type(&self) -> BoxType {
-        BoxType::AvcCBox
+        BoxType::Av1CBox
     }
 
     fn box_size(&self) -> u64 {
-        let mut size = HEADER_SIZE + 7;
-        for sps in self.sequence_parameter_sets.iter() {
-            size += sps.size() as u64;
-        }
-        for pps in self.picture_parameter_sets.iter() {
-            size += pps.size() as u64;
-        }
+        let mut size = HEADER_SIZE + 4;
+        size += self.sequence_header.len() as u64;
         size
     }
 
@@ -263,98 +265,81 @@ impl Mp4Box for AvcCBox {
     }
 
     fn summary(&self) -> Result<String> {
-        let s = format!("avc_profile_indication={}", self.avc_profile_indication);
+        let s = format!("profile={}", self.profile);
         Ok(s)
     }
 }
 
-impl<R: Read + Seek> ReadBox<&mut R> for AvcCBox {
+impl<R: Read + Seek> ReadBox<&mut R> for Av1CBox {
     fn read_box(reader: &mut R, size: u64) -> Result<Self> {
         let start = box_start(reader)?;
 
-        let configuration_version = reader.read_u8()?;
-        let avc_profile_indication = reader.read_u8()?;
-        let profile_compatibility = reader.read_u8()?;
-        let avc_level_indication = reader.read_u8()?;
-        let length_size_minus_one = reader.read_u8()? & 0x3;
-        let num_of_spss = reader.read_u8()? & 0x1F;
-        let mut sequence_parameter_sets = Vec::with_capacity(num_of_spss as usize);
-        for _ in 0..num_of_spss {
-            let nal_unit = NalUnit::read(reader)?;
-            sequence_parameter_sets.push(nal_unit);
-        }
-        let num_of_ppss = reader.read_u8()?;
-        let mut picture_parameter_sets = Vec::with_capacity(num_of_ppss as usize);
-        for _ in 0..num_of_ppss {
-            let nal_unit = NalUnit::read(reader)?;
-            picture_parameter_sets.push(nal_unit);
-        }
+        let mut info = [0; 4];
+        reader.read_exact(&mut info)?;
+        let profile = info[1] >> 5;
+        let level_idx = info[1] & 0x1f;
+        let tier = info[2] >> 7;
+        let high_bit_depth = (info[2] >> 6) & 1 == 1;
+        let bit_depth_twelve = (info[2] >> 5) & 1 == 1;
+        let monochrome = (info[2] >> 4) & 1 == 1;
+        let subsampling_x = (info[2] >> 3) & 1;
+        let subsampling_y = (info[2] >> 2) & 1;
+        let chroma_sample_position = info[2] & 0x3;
+
+        let initial_presentation_delay_present = ((info[3] >> 4) & 1) == 1;
+        let initial_presentation_delay_minus_one = info[3] & 0xf;
+
+        let position = reader.stream_position()?;
+        let sequence_header_length = start + size - position;
+        let mut sequence_header = vec![0; sequence_header_length as usize];
+        reader.read_exact(&mut sequence_header)?;
 
         skip_bytes_to(reader, start + size)?;
 
-        Ok(AvcCBox {
-            configuration_version,
-            avc_profile_indication,
-            profile_compatibility,
-            avc_level_indication,
-            length_size_minus_one,
-            sequence_parameter_sets,
-            picture_parameter_sets,
+        let bit_depth = match (high_bit_depth, bit_depth_twelve) {
+            (true, true) => 12,
+            (true, false) => 10,
+            (false, _) => 8,
+        };
+
+        Ok(Av1CBox {
+            sequence_header,
+            profile,
+            level_idx,
+            tier,
+            bit_depth,
+            monochrome,
+            subsampling_x,
+            subsampling_y,
+            chroma_sample_position,
+            initial_presentation_delay_minus_one: initial_presentation_delay_present
+                .then_some(initial_presentation_delay_minus_one),
         })
     }
 }
 
-impl<W: Write> WriteBox<&mut W> for AvcCBox {
+impl<W: Write> WriteBox<&mut W> for Av1CBox {
     fn write_box(&self, writer: &mut W) -> Result<u64> {
         let size = self.box_size();
         BoxHeader::new(self.box_type(), size).write(writer)?;
 
-        writer.write_u8(self.configuration_version)?;
-        writer.write_u8(self.avc_profile_indication)?;
-        writer.write_u8(self.profile_compatibility)?;
-        writer.write_u8(self.avc_level_indication)?;
-        writer.write_u8(self.length_size_minus_one | 0xFC)?;
-        writer.write_u8(self.sequence_parameter_sets.len() as u8 | 0xE0)?;
-        for sps in self.sequence_parameter_sets.iter() {
-            sps.write(writer)?;
-        }
-        writer.write_u8(self.picture_parameter_sets.len() as u8)?;
-        for pps in self.picture_parameter_sets.iter() {
-            pps.write(writer)?;
-        }
+        writer.write_u8(129)?; // marker + version
+        writer.write_u8(self.profile << 5 | self.level_idx)?;
+        writer.write_u8(
+            self.tier << 7
+                | u8::from(self.bit_depth > 8) << 6
+                | u8::from(self.bit_depth == 12) << 5
+                | u8::from(self.monochrome) << 4
+                | self.subsampling_x << 3
+                | self.subsampling_y << 2
+                | self.chroma_sample_position,
+        )?;
+
+        // TODO: write initial presentation delay
+        writer.write_u8(0)?;
+
+        writer.write_all(&self.sequence_header)?;
         Ok(size)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-pub struct NalUnit {
-    pub bytes: Vec<u8>,
-}
-
-impl From<&[u8]> for NalUnit {
-    fn from(bytes: &[u8]) -> Self {
-        Self {
-            bytes: bytes.to_vec(),
-        }
-    }
-}
-
-impl NalUnit {
-    fn size(&self) -> usize {
-        2 + self.bytes.len()
-    }
-
-    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self> {
-        let length = reader.read_u16::<BigEndian>()? as usize;
-        let mut bytes = vec![0u8; length];
-        reader.read_exact(&mut bytes)?;
-        Ok(NalUnit { bytes })
-    }
-
-    fn write<W: Write>(&self, writer: &mut W) -> Result<u64> {
-        writer.write_u16::<BigEndian>(self.bytes.len() as u16)?;
-        writer.write_all(&self.bytes)?;
-        Ok(self.size() as u64)
     }
 }
 
@@ -365,8 +350,8 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn test_avc1() {
-        let src_box = Avc1Box {
+    fn test_av01() {
+        let src_box = Av01Box {
             data_reference_index: 1,
             width: 320,
             height: 240,
@@ -374,24 +359,30 @@ mod tests {
             vertresolution: FixedPointU16::new(0x48),
             frame_count: 1,
             depth: 24,
-            avcc: AvcCBox {
-                configuration_version: 1,
-                avc_profile_indication: 100,
-                profile_compatibility: 0,
-                avc_level_indication: 13,
-                length_size_minus_one: 3,
-                sequence_parameter_sets: vec![NalUnit {
-                    bytes: vec![
-                        0x67, 0x64, 0x00, 0x0D, 0xAC, 0xD9, 0x41, 0x41, 0xFA, 0x10, 0x00, 0x00,
-                        0x03, 0x00, 0x10, 0x00, 0x00, 0x03, 0x03, 0x20, 0xF1, 0x42, 0x99, 0x60,
-                    ],
-                }],
-                picture_parameter_sets: vec![NalUnit {
-                    bytes: vec![0x68, 0xEB, 0xE3, 0xCB, 0x22, 0xC0],
-                }],
+            av1c: Av1CBox {
+                tier: 0,
+                profile: 0,
+                level_idx: 8,
+                bit_depth: 8,
+                monochrome: false,
+                subsampling_x: 1,
+                subsampling_y: 1,
+                chroma_sample_position: 0,
+                initial_presentation_delay_minus_one: None,
+                sequence_header: vec![10, 11, 0, 0, 0, 66, 167, 191, 230, 46, 223, 200, 66],
             },
-            colr: None,
-            pasp: None,
+            colr: Some(ColrBox {
+                color_config: colr::Color::Nclx(ColorConfig {
+                    color_primaries: 9,
+                    transfer_characteristics: 16,
+                    matrix_coefficients: 9,
+                    full_range: false,
+                }),
+            }),
+            pasp: Some(PaspBox {
+                numerator: 16,
+                denumerator: 9,
+            }),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -399,10 +390,10 @@ mod tests {
 
         let mut reader = Cursor::new(&buf);
         let header = BoxHeader::read(&mut reader).unwrap();
-        assert_eq!(header.name, BoxType::Avc1Box);
+        assert_eq!(header.name, BoxType::Av01Box);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Avc1Box::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Av01Box::read_box(&mut reader, header.size).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

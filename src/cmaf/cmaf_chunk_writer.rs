@@ -1,5 +1,4 @@
-use byteorder::{BigEndian, WriteBytesExt};
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{Seek, Write};
 use std::time::Duration;
 
 use crate::mfhd::MfhdBox;
@@ -25,12 +24,25 @@ impl From<MediaConfig> for CmafChunkConfig {
             MediaConfig::AacConfig(aac_conf) => Self::from(aac_conf),
             MediaConfig::TtxtConfig(ttxt_conf) => Self::from(ttxt_conf),
             MediaConfig::Vp9Config(vp9_config) => Self::from(vp9_config),
+            MediaConfig::Av1Config(av1_config) => Self::from(av1_config),
+            MediaConfig::OpusConfig(opus_config) => Self::from(opus_config),
         }
     }
 }
 
 impl From<AvcConfig> for CmafChunkConfig {
     fn from(avc_conf: AvcConfig) -> Self {
+        Self {
+            timescale: 1000, // XXX
+            default_sample_duration: 0,
+            default_sample_size: 0,
+            default_sample_flags: 0,
+        }
+    }
+}
+
+impl From<Av1Config> for CmafChunkConfig {
+    fn from(avc_conf: Av1Config) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
@@ -53,6 +65,17 @@ impl From<HevcConfig> for CmafChunkConfig {
 
 impl From<AacConfig> for CmafChunkConfig {
     fn from(aac_conf: AacConfig) -> Self {
+        Self {
+            timescale: 1000, // XXX
+            default_sample_duration: 0,
+            default_sample_size: 0,
+            default_sample_flags: 0,
+        }
+    }
+}
+
+impl From<OpusConfig> for CmafChunkConfig {
+    fn from(opus_conf: OpusConfig) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
@@ -151,7 +174,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     }
 
     pub fn starts_with_keyframe(&self) -> bool {
-        let Some(ref trun ) = self.traf.trun else {
+        let Some(ref trun) = self.traf.trun else {
             return false;
         };
 
@@ -166,7 +189,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     }
 
     pub fn contains_keyframe(&self) -> bool {
-        let Some(ref trun ) = self.traf.trun else {
+        let Some(ref trun) = self.traf.trun else {
             return false;
         };
 
@@ -290,7 +313,7 @@ mod tests {
         let mut buffer = vec![0; header.metadata().unwrap().len() as usize];
         header.read_exact(&mut buffer).unwrap();
         buffer.append(&mut data);
-        let size = data.len() as u64;
+        let size = buffer.len() as u64;
         let mp4 = Mp4Reader::read_header(Cursor::new(buffer), size)?;
 
         println!("{:?}", mp4);

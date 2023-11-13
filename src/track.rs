@@ -4,6 +4,7 @@ use std::convert::TryFrom;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::Duration;
 
+use crate::av01::Av01Box;
 use crate::mp4box::traf::TrafBox;
 use crate::mp4box::trak::TrakBox;
 use crate::mp4box::trun::TrunBox;
@@ -12,6 +13,7 @@ use crate::mp4box::{
     smhd::SmhdBox, stco::StcoBox, stsc::StscEntry, stss::StssBox, stts::SttsEntry, tx3g::Tx3gBox,
     vmhd::VmhdBox, vp09::Vp09Box,
 };
+use crate::opus::OpusBox;
 use crate::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +32,8 @@ impl From<MediaConfig> for TrackConfig {
             MediaConfig::AacConfig(aac_conf) => Self::from(aac_conf),
             MediaConfig::TtxtConfig(ttxt_conf) => Self::from(ttxt_conf),
             MediaConfig::Vp9Config(vp9_config) => Self::from(vp9_config),
+            MediaConfig::Av1Config(av1_config) => Self::from(av1_config),
+            MediaConfig::OpusConfig(opus_conf) => Self::from(opus_conf),
         }
     }
 }
@@ -56,6 +60,17 @@ impl From<HevcConfig> for TrackConfig {
     }
 }
 
+impl From<Av1Config> for TrackConfig {
+    fn from(av1_conf: Av1Config) -> Self {
+        Self {
+            track_type: TrackType::Video,
+            timescale: 1000,               // XXX
+            language: String::from("und"), // XXX
+            media_conf: MediaConfig::Av1Config(av1_conf),
+        }
+    }
+}
+
 impl From<AacConfig> for TrackConfig {
     fn from(aac_conf: AacConfig) -> Self {
         Self {
@@ -63,6 +78,17 @@ impl From<AacConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AacConfig(aac_conf),
+        }
+    }
+}
+
+impl From<OpusConfig> for TrackConfig {
+    fn from(opus_conf: OpusConfig) -> Self {
+        Self {
+            track_type: TrackType::Audio,
+            timescale: 1000,               // XXX
+            language: String::from("und"), // XXX
+            media_conf: MediaConfig::OpusConfig(opus_conf),
         }
     }
 }
@@ -125,8 +151,12 @@ impl Mp4Track {
             Ok(MediaType::H265)
         } else if self.trak.mdia.minf.stbl.stsd.vp09.is_some() {
             Ok(MediaType::VP9)
+        } else if self.trak.mdia.minf.stbl.stsd.av01.is_some() {
+            Ok(MediaType::AV1)
         } else if self.trak.mdia.minf.stbl.stsd.mp4a.is_some() {
             Ok(MediaType::AAC)
+        } else if self.trak.mdia.minf.stbl.stsd.opus.is_some() {
+            Ok(MediaType::OPUS)
         } else if self.trak.mdia.minf.stbl.stsd.tx3g.is_some() {
             Ok(MediaType::TTXT)
         } else {
@@ -141,8 +171,12 @@ impl Mp4Track {
             Ok(FourCC::from(BoxType::Hev1Box))
         } else if self.trak.mdia.minf.stbl.stsd.vp09.is_some() {
             Ok(FourCC::from(BoxType::Vp09Box))
+        } else if self.trak.mdia.minf.stbl.stsd.av01.is_some() {
+            Ok(FourCC::from(BoxType::Av01Box))
         } else if self.trak.mdia.minf.stbl.stsd.mp4a.is_some() {
             Ok(FourCC::from(BoxType::Mp4aBox))
+        } else if self.trak.mdia.minf.stbl.stsd.opus.is_some() {
+            Ok(FourCC::from(BoxType::OpusBox))
         } else if self.trak.mdia.minf.stbl.stsd.tx3g.is_some() {
             Ok(FourCC::from(BoxType::Tx3gBox))
         } else {
@@ -175,6 +209,16 @@ impl Mp4Track {
         }
     }
 
+    pub fn sample_rate(&self) -> Option<u32> {
+        if let Some(ref opus) = self.trak.mdia.minf.stbl.stsd.opus {
+            return Some(opus.samplerate.value() as u32);
+        }
+
+        let sample_freq_index = self.sample_freq_index().ok()?;
+
+        Some(sample_freq_index.freq())
+    }
+
     pub fn sample_freq_index(&self) -> Result<SampleFreqIndex> {
         if let Some(ref mp4a) = self.trak.mdia.minf.stbl.stsd.mp4a {
             if let Some(ref esds) = mp4a.esds {
@@ -188,6 +232,10 @@ impl Mp4Track {
     }
 
     pub fn channel_config(&self) -> Result<ChannelConfig> {
+        if let Some(ref opus) = self.trak.mdia.minf.stbl.stsd.opus {
+            return ChannelConfig::try_from(opus.dops.channel_mapping_family.get_channel_count());
+        }
+
         if let Some(ref mp4a) = self.trak.mdia.minf.stbl.stsd.mp4a {
             if let Some(ref esds) = mp4a.esds {
                 ChannelConfig::try_from(esds.es_desc.dec_config.dec_specific.chan_conf)
@@ -675,6 +723,12 @@ impl Mp4TrackWriter {
 
                 trak.mdia.minf.stbl.stsd.vp09 = Some(Vp09Box::new(config));
             }
+            MediaConfig::Av1Config(ref config) => {
+                trak.tkhd.set_width(config.width);
+                trak.tkhd.set_height(config.height);
+
+                trak.mdia.minf.stbl.stsd.av01 = Some(Av01Box::new(config));
+            }
             MediaConfig::AacConfig(ref aac_config) => {
                 let smhd = SmhdBox::default();
                 trak.mdia.minf.smhd = Some(smhd);
@@ -685,6 +739,10 @@ impl Mp4TrackWriter {
             MediaConfig::TtxtConfig(ref _ttxt_config) => {
                 let tx3g = Tx3gBox::default();
                 trak.mdia.minf.stbl.stsd.tx3g = Some(tx3g);
+            }
+            MediaConfig::OpusConfig(ref opus_config) => {
+                let opus = OpusBox::new(opus_config);
+                trak.mdia.minf.stbl.stsd.opus = Some(opus);
             }
         }
         Ok(Mp4TrackWriter {
