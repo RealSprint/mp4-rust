@@ -8,8 +8,6 @@ use crate::tfhd::TfhdBox;
 use crate::trun::TrunBox;
 use crate::*;
 
-use super::emsg::EmsgData;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CmafChunkConfig {
     pub timescale: u32,
@@ -247,8 +245,8 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         Ok(duration as u64)
     }
 
-    pub fn add_emsg(&mut self, data: EmsgData) {
-        self.emsgs.push(data.build_box());
+    pub fn add_emsg(&mut self, emsg: EmsgBox) {
+        self.emsgs.push(emsg);
     }
 
     pub fn write_end(&mut self) -> Result<()> {
