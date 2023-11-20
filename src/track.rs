@@ -115,7 +115,7 @@ impl From<Vp9Config> for TrackConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mp4Track {
     pub trak: TrakBox,
     pub trafs: Vec<TrafBox>,
