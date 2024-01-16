@@ -6,6 +6,7 @@ use crate::mp4box::*;
 use crate::mp4box::{edts::EdtsBox, mdia::MdiaBox, tkhd::TkhdBox};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[repr(C)]
 pub struct TrakBox {
     pub tkhd: TkhdBox,
 

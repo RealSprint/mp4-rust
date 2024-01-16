@@ -11,6 +11,7 @@ pub enum TrackFlag {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[repr(C)]
 pub struct TkhdBox {
     pub version: u8,
     pub flags: u32,

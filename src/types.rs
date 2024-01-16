@@ -685,6 +685,7 @@ pub enum MediaConfig {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct Mp4Sample {
     pub start_time: u64,
     pub duration: u32,
