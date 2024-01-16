@@ -11,10 +11,10 @@ pub struct TrakBox {
     pub tkhd: TkhdBox,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub edts: Option<EdtsBox>,
+    edts: Option<EdtsBox>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<MetaBox>,
+    meta: Option<MetaBox>,
 
     pub mdia: MdiaBox,
 }
