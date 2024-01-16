@@ -626,9 +626,34 @@ impl Mp4Track {
     }
 
     fn is_sync_sample(&self, sample_id: u32) -> bool {
-        if !self.trafs.is_empty() {
-            let sample_sizes_count = self.sample_count() / self.trafs.len() as u32;
-            return sample_id == 1 || sample_id % sample_sizes_count == 0;
+        if let Some((traf_idx, sample_idx)) = self.find_traf_idx_and_sample_idx(sample_id) {
+            let traf = &self.trafs[traf_idx];
+            let trun = traf.trun.as_ref();
+
+            if let Some(trun) = trun {
+                if let Some(sample_flags) = trun.sample_flags.get(sample_idx) {
+                    return (TrunBox::FLAG_SAMPLE_DEPENDS_YES
+                        | TrunBox::FLAG_SAMPLE_FLAG_IS_NON_SYNC)
+                        & sample_flags
+                        == 0;
+                }
+
+                if sample_idx == 0 {
+                    if let Some(first_sample_flags) = trun.first_sample_flags {
+                        return (TrunBox::FLAG_SAMPLE_DEPENDS_YES
+                            | TrunBox::FLAG_SAMPLE_FLAG_IS_NON_SYNC)
+                            & first_sample_flags
+                            == 0;
+                    }
+                }
+            }
+
+            let tfhd = &traf.tfhd;
+            if let Some(default_sample_flags) = tfhd.default_sample_flags {
+                return (TrunBox::FLAG_SAMPLE_DEPENDS_YES | TrunBox::FLAG_SAMPLE_FLAG_IS_NON_SYNC)
+                    & default_sample_flags
+                    == 0;
+            }
         }
 
         if let Some(ref stss) = self.trak.mdia.minf.stbl.stss {
