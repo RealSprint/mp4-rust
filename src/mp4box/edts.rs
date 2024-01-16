@@ -5,6 +5,7 @@ use crate::mp4box::elst::ElstBox;
 use crate::mp4box::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[repr(C)]
 pub struct EdtsBox {
     pub elst: Option<ElstBox>,
 }

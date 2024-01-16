@@ -53,6 +53,7 @@ impl Default for TkhdBox {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[repr(C)]
 pub struct Matrix {
     pub a: i32,
     pub b: i32,

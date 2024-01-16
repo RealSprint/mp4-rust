@@ -11,6 +11,7 @@ pub use bytes::Bytes;
 pub use num_rational::Ratio;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[repr(transparent)]
 pub struct FixedPointU8(Ratio<u16>);
 
 impl FixedPointU8 {
@@ -53,6 +54,7 @@ impl FixedPointI8 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[repr(transparent)]
 pub struct FixedPointU16(Ratio<u32>);
 
 impl FixedPointU16 {

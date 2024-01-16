@@ -6,6 +6,7 @@ use std::mem::size_of;
 use crate::mp4box::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[repr(C)]
 pub struct ElstBox {
     pub version: u8,
     pub flags: u32,
@@ -15,6 +16,7 @@ pub struct ElstBox {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[repr(C)]
 pub struct ElstEntry {
     pub segment_duration: u64,
     pub media_time: u64,

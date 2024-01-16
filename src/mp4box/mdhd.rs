@@ -6,6 +6,7 @@ use std::io::{Read, Seek, Write};
 use crate::mp4box::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[repr(C)]
 pub struct MdhdBox {
     pub version: u8,
     pub flags: u32,
