@@ -684,7 +684,7 @@ pub enum MediaConfig {
     TtxtConfig(TtxtConfig),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mp4Sample {
     pub start_time: u64,
     pub duration: u32,

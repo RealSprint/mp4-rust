@@ -16,6 +16,8 @@ use crate::mp4box::{
 use crate::opus::OpusBox;
 use crate::*;
 
+use self::colr::Color;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrackConfig {
     pub track_type: TrackType,
@@ -198,6 +200,106 @@ impl Mp4Track {
         } else {
             self.trak.tkhd.height.value()
         }
+    }
+
+    pub fn media_config(&self) -> Result<MediaConfig> {
+        match self.media_type()? {
+            MediaType::H264 => Ok(MediaConfig::AvcConfig(AvcConfig {
+                width: self.width(),
+                height: self.height(),
+                seq_param_set: self.sequence_parameter_set()?.to_vec(),
+                pic_param_set: self.picture_parameter_set()?.to_vec(),
+                color: self.color_config().cloned(),
+                aspect_ratio: self.aspect_ratio(),
+            })),
+            MediaType::H265 => Ok(MediaConfig::HevcConfig(HevcConfig {
+                width: self.width(),
+                height: self.height(),
+            })),
+            MediaType::AV1 => {
+                if let Some(av01) = self.trak.mdia.minf.stbl.stsd.av01.as_ref() {
+                    let av1c = &av01.av1c;
+
+                    return Ok(MediaConfig::Av1Config(Av1Config {
+                        width: self.width(),
+                        height: self.height(),
+                        color: self.color_config().cloned(),
+                        aspect_ratio: self.aspect_ratio(),
+                        sequence_header: av1c.sequence_header.clone(),
+                        tier: av1c.tier,
+                        profile: av1c.profile,
+                        level_idx: av1c.level_idx,
+                        bit_depth: av1c.bit_depth,
+                        monochrome: av1c.monochrome,
+                        subsampling_x: av1c.subsampling_x,
+                        subsampling_y: av1c.subsampling_y,
+                        chroma_sample_position: av1c.chroma_sample_position,
+                        initial_presentation_delay_minus_one: av1c
+                            .initial_presentation_delay_minus_one,
+                    }));
+                }
+                Err(Error::BoxNotFound(BoxType::Av01Box))
+            }
+            MediaType::VP9 => Ok(MediaConfig::Vp9Config(Vp9Config {
+                width: self.width(),
+                height: self.height(),
+            })),
+            MediaType::AAC => Ok(MediaConfig::AacConfig(AacConfig {
+                bitrate: self.bitrate(),
+                profile: self.audio_profile()?,
+                freq_index: self.sample_freq_index()?,
+                chan_conf: self.channel_config()?,
+            })),
+            MediaType::OPUS => {
+                if let Some(opus) = self.trak.mdia.minf.stbl.stsd.opus.as_ref() {
+                    return Ok(MediaConfig::OpusConfig(OpusConfig {
+                        bitrate: self.bitrate(),
+                        pre_skip: opus.dops.pre_skip,
+                        sample_rate: opus.dops.input_sample_rate,
+                        output_gain: opus.dops.output_gain,
+                        channel_mapping_family: opus.dops.channel_mapping_family.clone(),
+                    }));
+                }
+
+                Err(Error::BoxNotFound(BoxType::OpusBox))
+            }
+            MediaType::TTXT => Ok(MediaConfig::TtxtConfig(TtxtConfig {})),
+        }
+    }
+
+    pub fn color_config(&self) -> Option<&ColorConfig> {
+        let stst = &self.trak.mdia.minf.stbl.stsd;
+        let color_config = match (&stst.av01, &stst.avc1) {
+            (Some(ref av01), _) => av01.colr.as_ref(),
+            (_, Some(ref avc1)) => avc1.colr.as_ref(),
+            _ => return None,
+        };
+
+        let Some(color_config) = color_config else {
+            return None;
+        };
+
+        if let Color::Nclx(ref color) = color_config.color_config {
+            return Some(color);
+        }
+
+        None
+    }
+
+    pub fn aspect_ratio(&self) -> Option<(u32, u32)> {
+        let stst = &self.trak.mdia.minf.stbl.stsd;
+
+        let pasp_config = match (&stst.av01, &stst.avc1) {
+            (Some(ref av01), _) => av01.pasp.as_ref(),
+            (_, Some(ref avc1)) => avc1.pasp.as_ref(),
+            _ => return None,
+        };
+
+        if let Some(pasp_config) = pasp_config {
+            return Some((pasp_config.numerator, pasp_config.denumerator));
+        };
+
+        None
     }
 
     pub fn frame_rate(&self) -> f64 {
