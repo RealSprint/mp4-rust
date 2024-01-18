@@ -16,6 +16,8 @@ use crate::mp4box::{
 use crate::opus::OpusBox;
 use crate::*;
 
+use self::colr::Color;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrackConfig {
     pub track_type: TrackType,
@@ -198,6 +200,41 @@ impl Mp4Track {
         } else {
             self.trak.tkhd.height.value()
         }
+    }
+
+    pub fn color_config(&self) -> Option<&ColorConfig> {
+        let stst = &self.trak.mdia.minf.stbl.stsd;
+        let color_config = match (&stst.av01, &stst.avc1) {
+            (Some(ref av01), _) => av01.colr.as_ref(),
+            (_, Some(ref avc1)) => avc1.colr.as_ref(),
+            _ => return None,
+        };
+
+        let Some(color_config) = color_config else {
+            return None;
+        };
+
+        if let Color::Nclx(ref color) = color_config.color_config {
+            return Some(color);
+        }
+
+        None
+    }
+
+    pub fn aspect_ratio(&self) -> Option<(u32, u32)> {
+        let stst = &self.trak.mdia.minf.stbl.stsd;
+
+        let pasp_config = match (&stst.av01, &stst.avc1) {
+            (Some(ref av01), _) => av01.pasp.as_ref(),
+            (_, Some(ref avc1)) => avc1.pasp.as_ref(),
+            _ => return None,
+        };
+
+        if let Some(pasp_config) = pasp_config {
+            return Some((pasp_config.numerator, pasp_config.denumerator));
+        };
+
+        None
     }
 
     pub fn frame_rate(&self) -> f64 {
