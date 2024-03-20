@@ -74,7 +74,7 @@ pub(crate) mod elst;
 pub(crate) mod emsg;
 pub(crate) mod ftyp;
 pub(crate) mod hdlr;
-pub(crate) mod hev1;
+pub mod hev1;
 pub(crate) mod ilst;
 pub(crate) mod mdhd;
 pub(crate) mod mdia;
