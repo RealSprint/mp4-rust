@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::io::{Read, Seek};
 use std::time::Duration;
 
+use prft::PrftBox;
+
 use crate::meta::MetaBox;
 use crate::*;
 
@@ -11,6 +13,7 @@ pub struct Mp4Reader<R> {
     pub ftyp: FtypBox,
     pub moov: MoovBox,
     pub moofs: Vec<MoofBox>,
+    pub prfts: Vec<PrftBox>,
     pub emsgs: Vec<EmsgBox>,
 
     tracks: HashMap<u32, Mp4Track>,
@@ -24,6 +27,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
         let mut ftyp = None;
         let mut moov = None;
         let mut moofs = Vec::new();
+        let mut prfts = Vec::new();
         let mut moof_offsets = Vec::new();
         let mut emsgs = Vec::new();
 
@@ -66,6 +70,10 @@ impl<R: Read + Seek> Mp4Reader<R> {
                 BoxType::EmsgBox => {
                     let emsg = EmsgBox::read_box(&mut reader, s)?;
                     emsgs.push(emsg);
+                }
+                BoxType::PrftBox => {
+                    let emsg = PrftBox::read_box(&mut reader, s)?;
+                    prfts.push(emsg);
                 }
                 _ => {
                     // XXX warn!()
@@ -124,6 +132,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
             moov: moov.unwrap(),
             moofs,
             emsgs,
+            prfts,
             size,
             tracks,
         })
@@ -137,6 +146,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
         let start = reader.stream_position()?;
 
         let mut moofs = Vec::new();
+        let mut prfts = Vec::new();
         let mut moof_offsets = Vec::new();
         let mut emsgs = Vec::new();
 
@@ -164,6 +174,10 @@ impl<R: Read + Seek> Mp4Reader<R> {
                 BoxType::EmsgBox => {
                     let emsg = EmsgBox::read_box(&mut reader, s)?;
                     emsgs.push(emsg);
+                }
+                BoxType::PrftBox => {
+                    let prft = PrftBox::read_box(&mut reader, s)?;
+                    prfts.push(prft);
                 }
                 BoxType::MoofBox => {
                     let moof_offset = reader.stream_position()? - 8;
@@ -215,6 +229,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
             moov: self.moov.clone(),
             moofs,
             emsgs,
+            prfts,
             tracks,
             size,
         })

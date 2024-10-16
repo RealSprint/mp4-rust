@@ -1,6 +1,8 @@
 use std::io::{Seek, Write};
 use std::time::Duration;
 
+use prft::PrftBox;
+
 use crate::mfhd::MfhdBox;
 use crate::mp4box::traf::TrafBox;
 
@@ -14,6 +16,13 @@ pub struct CmafChunkConfig {
     pub default_sample_duration: u32,
     pub default_sample_size: u32,
     pub default_sample_flags: u32,
+    pub producer_reference_time: Option<ProducerReferenceTime>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProducerReferenceTime {
+    pub ntp_timestamp: u64,
+    pub media_time: u64,
 }
 
 impl From<MediaConfig> for CmafChunkConfig {
@@ -37,6 +46,7 @@ impl From<AvcConfig> for CmafChunkConfig {
             default_sample_duration: 0,
             default_sample_size: 0,
             default_sample_flags: 0,
+            producer_reference_time: None,
         }
     }
 }
@@ -48,6 +58,7 @@ impl From<Av1Config> for CmafChunkConfig {
             default_sample_duration: 0,
             default_sample_size: 0,
             default_sample_flags: 0,
+            producer_reference_time: None,
         }
     }
 }
@@ -59,6 +70,7 @@ impl From<HevcConfig> for CmafChunkConfig {
             default_sample_duration: 0,
             default_sample_size: 0,
             default_sample_flags: 0,
+            producer_reference_time: None,
         }
     }
 }
@@ -70,6 +82,7 @@ impl From<AacConfig> for CmafChunkConfig {
             default_sample_duration: 0,
             default_sample_size: 0,
             default_sample_flags: 0,
+            producer_reference_time: None,
         }
     }
 }
@@ -81,6 +94,7 @@ impl From<OpusConfig> for CmafChunkConfig {
             default_sample_duration: 0,
             default_sample_size: 0,
             default_sample_flags: 0,
+            producer_reference_time: None,
         }
     }
 }
@@ -92,6 +106,7 @@ impl From<TtxtConfig> for CmafChunkConfig {
             default_sample_duration: 0,
             default_sample_size: 0,
             default_sample_flags: 0,
+            producer_reference_time: None,
         }
     }
 }
@@ -103,6 +118,7 @@ impl From<Vp9Config> for CmafChunkConfig {
             default_sample_duration: 0,
             default_sample_size: 0,
             default_sample_flags: 0,
+            producer_reference_time: None,
         }
     }
 }
@@ -113,6 +129,7 @@ pub struct CmafChunkWriter<W> {
     writer: W,
     traf: TrafBox,
     mfhd: MfhdBox,
+    prft: Option<PrftBox>,
     emsgs: Vec<EmsgBox>,
     samples: Vec<Bytes>,
     timescale: u32,
@@ -148,10 +165,19 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             sequence_number,
         };
 
+        let prft = config.producer_reference_time.as_ref().map(|prt| PrftBox {
+            version: 1,
+            flags: 0,
+            reference_track_id: track_id,
+            ntp_timestamp: prt.ntp_timestamp,
+            media_time: prt.media_time,
+        });
+
         Ok(CmafChunkWriter {
             writer,
             traf,
             mfhd,
+            prft,
             emsgs: vec![],
             samples: vec![],
             timescale: config.timescale,
@@ -267,6 +293,10 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             emsg.write_box(&mut self.writer)?;
         }
 
+        if let Some(prft) = self.prft.as_ref() {
+            prft.write_box(&mut self.writer)?;
+        }
+
         moof.write_box(&mut self.writer)?;
 
         let mdat_size = self.samples.iter().map(|s| s.len()).sum::<usize>();
@@ -299,6 +329,7 @@ mod tests {
             default_sample_duration: 10,
             default_sample_size: 100,
             default_sample_flags: 0,
+            producer_reference_time: None,
         };
         let data = Cursor::new(Vec::<u8>::new());
 
