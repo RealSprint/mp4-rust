@@ -90,20 +90,24 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
         let mut moov = MoovBox {
             mvex: Some(MvexBox {
                 mehd: None,
-                trex: TrexBox {
-                    version: 0,
-                    flags: 0,
-                    track_id: 1,
-                    default_sample_description_index: 1,
-                    default_sample_duration: 0,
-                    default_sample_size: 0,
-                    default_sample_flags: 0,
-                },
+                trex: vec![],
             }),
             ..MoovBox::default()
         };
 
-        for track in self.tracks.iter_mut() {
+        for (i, track) in self.tracks.iter_mut().enumerate() {
+            let trex = TrexBox {
+                version: 0,
+                flags: 0,
+                track_id: (i + 1) as u32,
+                default_sample_description_index: 1,
+                default_sample_duration: 0,
+                default_sample_size: 0,
+                default_sample_flags: 0,
+            };
+
+            moov.mvex.as_mut().unwrap().trex.push(trex);
+
             moov.traks.push(track.write_end(&mut self.writer)?);
         }
 
