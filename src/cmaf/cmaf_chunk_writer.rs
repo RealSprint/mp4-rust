@@ -184,6 +184,10 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         })
     }
 
+    pub fn producer_reference_time(&self) -> Option<&PrftBox> {
+        self.prft.as_ref()
+    }
+
     pub fn duration(&self) -> Duration {
         if let Some(ref trun) = self.traf.trun {
             return Duration::from_micros(
