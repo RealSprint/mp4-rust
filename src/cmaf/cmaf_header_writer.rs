@@ -1,4 +1,5 @@
 use std::io::{Seek, Write};
+use std::time::Duration;
 
 use crate::mp4box::*;
 use crate::mvex::MvexBox;
@@ -19,7 +20,7 @@ pub struct CmafHeaderWriter<W> {
     writer: W,
     tracks: Vec<Mp4TrackWriter>,
     timescale: u32,
-    duration: u64,
+    duration: Duration,
 }
 
 impl<W> CmafHeaderWriter<W> {
@@ -60,7 +61,11 @@ impl<W> CmafHeaderWriter<W> {
 }
 
 impl<W: Write + Seek> CmafHeaderWriter<W> {
-    pub fn write_start(mut writer: W, config: &CmafHeaderConfig) -> Result<Self> {
+    pub fn write_start(
+        mut writer: W,
+        config: &CmafHeaderConfig,
+        duration: Option<Duration>,
+    ) -> Result<Self> {
         let ftyp = FtypBox {
             major_brand: config.major_brand,
             minor_version: config.minor_version,
@@ -70,12 +75,11 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
 
         let tracks = Vec::new();
         let timescale = config.timescale;
-        let duration = 0;
         Ok(Self {
             writer,
             tracks,
             timescale,
-            duration,
+            duration: duration.unwrap_or(Duration::from_secs(0)),
         })
     }
 
@@ -95,6 +99,8 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
             ..MoovBox::default()
         };
 
+        let duration = self.media_duration();
+
         for (i, track) in self.tracks.iter_mut().enumerate() {
             let trex = TrexBox {
                 version: 0,
@@ -108,17 +114,26 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
 
             moov.mvex.as_mut().unwrap().trex.push(trex);
 
-            moov.traks.push(track.write_end(&mut self.writer)?);
+            let mut trak = track.write_end(&mut self.writer)?;
+            trak.tkhd.duration = duration;
+
+            trak.mdia.mdhd.duration = self.duration.as_secs() * trak.mdia.mdhd.timescale as u64;
+
+            moov.traks.push(trak);
         }
 
         moov.mvhd.next_track_id = 2;
         moov.mvhd.timescale = self.timescale;
-        moov.mvhd.duration = self.duration;
+        moov.mvhd.duration = duration;
         if moov.mvhd.duration > (u32::MAX as u64) {
             moov.mvhd.version = 1
         }
         moov.write_box(&mut self.writer)?;
         Ok(())
+    }
+
+    fn media_duration(&self) -> u64 {
+        self.duration.as_secs() * self.timescale as u64
     }
 }
 
@@ -143,7 +158,7 @@ mod tests {
         };
         let data = Cursor::new(Vec::<u8>::new());
 
-        let mut writer = CmafHeaderWriter::write_start(data, &config)?;
+        let mut writer = CmafHeaderWriter::write_start(data, &config, None)?;
 
         writer.add_track(&TrackConfig {
             track_type: TrackType::Video,
