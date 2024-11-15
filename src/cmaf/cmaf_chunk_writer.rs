@@ -136,12 +136,7 @@ pub struct CmafChunkWriter<W> {
 }
 
 impl<W: Write + Seek> CmafChunkWriter<W> {
-    pub fn write_start(
-        writer: W,
-        sequence_number: u32,
-        track_id: u32,
-        config: &CmafChunkConfig,
-    ) -> Result<Self> {
+    pub fn write_start(writer: W, track_id: u32, config: &CmafChunkConfig) -> Result<Self> {
         let tfhd = TfhdBox {
             track_id,
             flags: TfhdBox::FLAG_DEFAULT_SAMPLE_FLAGS
@@ -162,7 +157,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         let mfhd = MfhdBox {
             flags: 0,
             version: 0,
-            sequence_number,
+            sequence_number: 0, // This is only a placeholder, the actual value will be set in write_end
         };
 
         let prft = config.producer_reference_time.as_ref().map(|prt| PrftBox {
@@ -279,7 +274,9 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         self.emsgs.push(emsg);
     }
 
-    pub fn write_end(&mut self) -> Result<()> {
+    pub fn write_end(&mut self, sequence_number: u32) -> Result<()> {
+        self.mfhd.sequence_number = sequence_number;
+
         let mut moof = MoofBox {
             mfhd: self.mfhd.clone(),
             trafs: vec![self.traf.clone()],
@@ -337,7 +334,7 @@ mod tests {
         };
         let data = Cursor::new(Vec::<u8>::new());
 
-        let mut writer = CmafChunkWriter::write_start(data, 1, 1, &config)?;
+        let mut writer = CmafChunkWriter::write_start(data, 1, &config)?;
 
         writer.write_sample(&Mp4Sample {
             start_time: 10,
@@ -347,7 +344,7 @@ mod tests {
             bytes: Bytes::from_static(&[0, 0, 0, 0, 0, 0, 0]),
         })?;
 
-        writer.write_end()?;
+        writer.write_end(1)?;
 
         let mut data: Vec<u8> = writer.into_writer().into_inner();
 
