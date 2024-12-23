@@ -300,127 +300,12 @@ impl<W: Write> WriteBox<&mut W> for DopsBox {
     }
 }
 
-trait Descriptor: Sized {
-    fn desc_tag() -> u8;
-    fn desc_size() -> u32;
-}
-
-trait ReadDesc<T>: Sized {
-    fn read_desc(_: T, size: u32) -> Result<Self>;
-}
-
-trait WriteDesc<T>: Sized {
-    fn write_desc(&self, _: T) -> Result<u32>;
-}
-
-fn read_desc<R: Read>(reader: &mut R) -> Result<(u8, u32)> {
-    let tag = reader.read_u8()?;
-
-    let mut size: u32 = 0;
-    for _ in 0..4 {
-        let b = reader.read_u8()?;
-        size = (size << 7) | (b & 0x7F) as u32;
-        if b & 0x80 == 0 {
-            break;
-        }
-    }
-
-    Ok((tag, size))
-}
-
-fn size_of_length(size: u32) -> u32 {
-    match size {
-        0x0..=0x7F => 1,
-        0x80..=0x3FFF => 2,
-        0x4000..=0x1FFFFF => 3,
-        _ => 4,
-    }
-}
-
-fn write_desc<W: Write>(writer: &mut W, tag: u8, size: u32) -> Result<u64> {
-    writer.write_u8(tag)?;
-
-    if size as u64 > std::u32::MAX as u64 {
-        return Err(Error::InvalidData("invalid descriptor length range"));
-    }
-
-    let nbytes = size_of_length(size);
-
-    for i in 0..nbytes {
-        let mut b = (size >> ((nbytes - i - 1) * 7)) as u8 & 0x7F;
-        if i < nbytes - 1 {
-            b |= 0x80;
-        }
-        writer.write_u8(b)?;
-    }
-
-    Ok(1 + nbytes as u64)
-}
-
-fn get_audio_object_type(byte_a: u8, byte_b: u8) -> u8 {
-    let mut profile = byte_a >> 3;
-    if profile == 31 {
-        profile = 32 + ((byte_a & 7) | (byte_b >> 5));
-    }
-
-    profile
-}
-
-fn get_chan_conf<R: Read + Seek>(
-    reader: &mut R,
-    byte_b: u8,
-    freq_index: u8,
-    extended_profile: bool,
-) -> Result<u8> {
-    let chan_conf;
-    if freq_index == 15 {
-        // Skip the 24 bit sample rate
-        let sample_rate = reader.read_u24::<BigEndian>()?;
-        chan_conf = ((sample_rate >> 4) & 0x0F) as u8;
-    } else if extended_profile {
-        let byte_c = reader.read_u8()?;
-        chan_conf = (byte_b & 1) | (byte_c & 0xE0);
-    } else {
-        chan_conf = (byte_b >> 3) & 0x0F;
-    }
-
-    Ok(chan_conf)
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct SLConfigDescriptor {}
 
 impl SLConfigDescriptor {
     pub fn new() -> Self {
         SLConfigDescriptor {}
-    }
-}
-
-impl Descriptor for SLConfigDescriptor {
-    fn desc_tag() -> u8 {
-        0x06
-    }
-
-    fn desc_size() -> u32 {
-        1
-    }
-}
-
-impl<R: Read + Seek> ReadDesc<&mut R> for SLConfigDescriptor {
-    fn read_desc(reader: &mut R, _size: u32) -> Result<Self> {
-        reader.read_u8()?; // pre-defined
-
-        Ok(SLConfigDescriptor {})
-    }
-}
-
-impl<W: Write> WriteDesc<&mut W> for SLConfigDescriptor {
-    fn write_desc(&self, writer: &mut W) -> Result<u32> {
-        let size = Self::desc_size();
-        write_desc(writer, Self::desc_tag(), size)?;
-
-        writer.write_u8(2)?; // pre-defined
-        Ok(size)
     }
 }
 
