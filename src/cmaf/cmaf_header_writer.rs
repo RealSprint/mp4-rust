@@ -192,7 +192,7 @@ mod tests {
         file.write_all(&data).unwrap();
 
         let reader = BufReader::new(Cursor::new(data));
-        let mp4 = Mp4Reader::read_header(reader, size)?;
+        Mp4Reader::read_header(reader, size)?;
 
         Ok(())
     }
