@@ -275,11 +275,7 @@ impl Mp4Track {
             _ => return None,
         };
 
-        let Some(color_config) = color_config else {
-            return None;
-        };
-
-        if let Color::Nclx(ref color) = color_config.color_config {
+        if let Color::Nclx(ref color) = color_config?.color_config {
             return Some(color);
         }
 
