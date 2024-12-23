@@ -76,7 +76,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for OpusBox {
         let version = reader.read_u16::<BigEndian>()?;
         reader.read_u16::<BigEndian>()?; // reserved
         reader.read_u32::<BigEndian>()?; // reserved
-        let channelcount = reader.read_u16::<BigEndian>()?;
+        let _channelcount = reader.read_u16::<BigEndian>()?;
         let samplesize = reader.read_u16::<BigEndian>()?;
         reader.read_u32::<BigEndian>()?; // pre-defined, reserved
         let samplerate = FixedPointU16::new_raw(reader.read_u32::<BigEndian>()?);
