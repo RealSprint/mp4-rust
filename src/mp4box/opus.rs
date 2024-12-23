@@ -264,8 +264,8 @@ impl Mp4Box for DopsBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for DopsBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
-        let start = box_start(reader)?;
+    fn read_box(reader: &mut R, _size: u64) -> Result<Self> {
+        let _start = box_start(reader)?;
         let version = reader.read_u8()?;
         let output_channel_count = reader.read_u8()?;
         let pre_skip = reader.read_u16::<BigEndian>()?;
