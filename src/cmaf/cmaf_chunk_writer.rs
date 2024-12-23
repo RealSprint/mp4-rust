@@ -40,7 +40,7 @@ impl From<MediaConfig> for CmafChunkConfig {
 }
 
 impl From<AvcConfig> for CmafChunkConfig {
-    fn from(avc_conf: AvcConfig) -> Self {
+    fn from(_avc_conf: AvcConfig) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
@@ -52,7 +52,7 @@ impl From<AvcConfig> for CmafChunkConfig {
 }
 
 impl From<Av1Config> for CmafChunkConfig {
-    fn from(avc_conf: Av1Config) -> Self {
+    fn from(_avc_conf: Av1Config) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
@@ -64,7 +64,7 @@ impl From<Av1Config> for CmafChunkConfig {
 }
 
 impl From<HevcConfig> for CmafChunkConfig {
-    fn from(hevc_conf: HevcConfig) -> Self {
+    fn from(_hevc_conf: HevcConfig) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
@@ -76,7 +76,7 @@ impl From<HevcConfig> for CmafChunkConfig {
 }
 
 impl From<AacConfig> for CmafChunkConfig {
-    fn from(aac_conf: AacConfig) -> Self {
+    fn from(_aac_conf: AacConfig) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
@@ -88,7 +88,7 @@ impl From<AacConfig> for CmafChunkConfig {
 }
 
 impl From<OpusConfig> for CmafChunkConfig {
-    fn from(opus_conf: OpusConfig) -> Self {
+    fn from(_opus_conf: OpusConfig) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
@@ -100,7 +100,7 @@ impl From<OpusConfig> for CmafChunkConfig {
 }
 
 impl From<TtxtConfig> for CmafChunkConfig {
-    fn from(txtt_conf: TtxtConfig) -> Self {
+    fn from(_txtt_conf: TtxtConfig) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
@@ -112,7 +112,7 @@ impl From<TtxtConfig> for CmafChunkConfig {
 }
 
 impl From<Vp9Config> for CmafChunkConfig {
-    fn from(vp9_conf: Vp9Config) -> Self {
+    fn from(_vp9_conf: Vp9Config) -> Self {
         Self {
             timescale: 1000, // XXX
             default_sample_duration: 0,
