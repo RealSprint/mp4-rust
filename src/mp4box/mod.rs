@@ -72,6 +72,7 @@ pub(crate) mod dinf;
 pub(crate) mod edts;
 pub(crate) mod elst;
 pub(crate) mod emsg;
+pub(crate) mod frma;
 pub(crate) mod ftyp;
 pub(crate) mod hdlr;
 pub mod hev1;
@@ -250,7 +251,8 @@ boxtype! {
     DescBox => 0x64657363,
     WideBox => 0x77696465,
     WaveBox => 0x77617665,
-    PrftBox => 0x70726674
+    PrftBox => 0x70726674,
+    FrmaBox => 0x66726d61
 }
 
 pub trait Mp4Box: Sized {
