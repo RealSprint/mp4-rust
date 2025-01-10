@@ -100,6 +100,7 @@ pub(crate) mod stsd;
 pub(crate) mod stss;
 pub(crate) mod stsz;
 pub(crate) mod stts;
+pub mod tenc;
 pub(crate) mod tfdt;
 pub(crate) mod tfhd;
 pub(crate) mod tkhd;
@@ -254,7 +255,8 @@ boxtype! {
     WaveBox => 0x77617665,
     PrftBox => 0x70726674,
     FrmaBox => 0x66726d61,
-    SchmBox => 0x7363686d
+    SchmBox => 0x7363686d,
+    TencBox => 0x74656e63
 }
 
 pub trait Mp4Box: Sized {
