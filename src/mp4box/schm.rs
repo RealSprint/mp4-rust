@@ -139,8 +139,9 @@ mod tests {
         assert_eq!(buf.len(), src_box.box_size() as usize);
 
         let expected: Vec<u8> = vec![
-            0, 0, 0, 20, b's', b'c', b'h', b'm', 0, 0, 0, 0, b'c', b'e', b'n', b'c', 0x00, 0x01,
-            0x00, 0x00,
+            0x00, 0x00, 0x00, 0x14, b's', b'c', b'h', b'm', //
+            0x00, 0x00, 0x00, 0x00, b'c', b'e', b'n', b'c', //
+            0x00, 0x01, 0x00, 0x00, //
         ];
 
         assert_eq!(buf, expected);
@@ -168,9 +169,11 @@ mod tests {
         assert_eq!(buf.len(), src_box.box_size() as usize);
 
         let expected: Vec<u8> = vec![
-            0, 0, 0, 40, b's', b'c', b'h', b'm', 0, 0, 0, 1, b'c', b'e', b'n', b'c', 0x00, 0x01,
-            0x00, 0x00, b'h', b't', b't', b'p', b's', b':', b'/', b'/', b'e', b'x', b'a', b'm',
-            b'p', b'l', b'e', b'.', b'c', b'o', b'm', 0,
+            0x00, 0x00, 0x00, 0x28, b's', b'c', b'h', b'm', //
+            0x00, 0x00, 0x00, 0x01, b'c', b'e', b'n', b'c', //
+            0x00, 0x01, 0x00, 0x00, b'h', b't', b't', b'p', //
+            b's', b':', b'/', b'/', b'e', b'x', b'a', b'm', //
+            b'p', b'l', b'e', b'.', b'c', b'o', b'm', 0x00, //
         ];
 
         assert_eq!(buf, expected);
