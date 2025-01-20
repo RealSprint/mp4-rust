@@ -11,13 +11,13 @@ use super::{
 const SCHM_BOX_SIZE: u64 = HEADER_SIZE + HEADER_EXT_SIZE + 4 + 4;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-struct SchmBox {
-    version: u8,
-    flags: u32,
+pub(crate) struct SchmBox {
+    pub(crate) version: u8,
+    pub(crate) flags: u32,
 
-    scheme_type: FourCC,
-    scheme_version: u32,
-    scheme_uri: Option<String>,
+    pub(crate) scheme_type: FourCC,
+    pub(crate) scheme_version: u32,
+    pub(crate) scheme_uri: Option<String>,
 }
 
 impl SchmBox {

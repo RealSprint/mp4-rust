@@ -9,8 +9,8 @@ use super::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-struct FrmaBox {
-    data_format: FourCC,
+pub(crate) struct FrmaBox {
+    pub(crate) data_format: FourCC,
 }
 
 impl FrmaBox {

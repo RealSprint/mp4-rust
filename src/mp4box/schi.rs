@@ -10,7 +10,7 @@ use super::{
 // ISO 14496-12:2022 - 8.12.7 Scheme Informatio nBox
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct SchiBox {
-    tenc: TencBox,
+    pub(crate) tenc: TencBox,
 }
 
 impl SchiBox {
