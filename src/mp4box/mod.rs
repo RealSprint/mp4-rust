@@ -72,6 +72,7 @@ pub(crate) mod dinf;
 pub(crate) mod edts;
 pub(crate) mod elst;
 pub(crate) mod emsg;
+pub(crate) mod frma;
 pub(crate) mod ftyp;
 pub(crate) mod hdlr;
 pub mod hev1;
@@ -90,6 +91,10 @@ pub(crate) mod mvhd;
 pub mod opus;
 pub(crate) mod pasp;
 pub mod prft;
+pub mod pssh;
+pub(crate) mod schi;
+pub(crate) mod schm;
+pub(crate) mod sinf;
 pub(crate) mod smhd;
 pub(crate) mod stbl;
 pub(crate) mod stco;
@@ -98,6 +103,7 @@ pub(crate) mod stsd;
 pub(crate) mod stss;
 pub(crate) mod stsz;
 pub(crate) mod stts;
+pub mod tenc;
 pub(crate) mod tfdt;
 pub(crate) mod tfhd;
 pub(crate) mod tkhd;
@@ -250,7 +256,14 @@ boxtype! {
     DescBox => 0x64657363,
     WideBox => 0x77696465,
     WaveBox => 0x77617665,
-    PrftBox => 0x70726674
+    PrftBox => 0x70726674,
+    FrmaBox => 0x66726d61,
+    SchmBox => 0x7363686d,
+    TencBox => 0x74656e63,
+    PsshBox => 0x70737368,
+    SchiBox => 0x73636869,
+    SinfBox => 0x73696e66
+
 }
 
 pub trait Mp4Box: Sized {
