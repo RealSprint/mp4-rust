@@ -10,6 +10,7 @@ use super::{
 
 const SCHM_BOX_SIZE: u64 = HEADER_SIZE + HEADER_EXT_SIZE + 4 + 4;
 
+// ISO 14496-12:2022 - 8.12.6 Scheme Type Box
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub(crate) struct SchmBox {
     pub(crate) version: u8,

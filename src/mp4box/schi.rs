@@ -7,7 +7,7 @@ use super::{
     WriteBox,
 };
 
-// ISO 14496-12:2022 - 8.12.7 Scheme Informatio nBox
+// ISO 14496-12:2022 - 8.12.7 Scheme Information Box
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct SchiBox {
     pub(crate) tenc: TencBox,

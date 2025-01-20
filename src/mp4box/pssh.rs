@@ -8,7 +8,7 @@ use super::{
     Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
-// ISO 23001-7:2023 - 8.1 Track Encryption Box
+// ISO 23001-7:2023 - 8.1 Protection System Specific Header Box
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct PsshBox {
     version: u8,
