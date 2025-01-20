@@ -92,6 +92,7 @@ pub mod opus;
 pub(crate) mod pasp;
 pub mod prft;
 pub mod pssh;
+pub(crate) mod schi;
 pub(crate) mod schm;
 pub(crate) mod smhd;
 pub(crate) mod stbl;
@@ -258,7 +259,8 @@ boxtype! {
     FrmaBox => 0x66726d61,
     SchmBox => 0x7363686d,
     TencBox => 0x74656e63,
-    PsshBox => 0x70737368
+    PsshBox => 0x70737368,
+    SchiBox => 0x73636869
 }
 
 pub trait Mp4Box: Sized {
