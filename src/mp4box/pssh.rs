@@ -54,6 +54,14 @@ impl PsshBox {
         }
     }
 
+    pub fn get_kid(&self) -> &Vec<[u8; 16]> {
+        &self.kid
+    }
+
+    pub fn get_system_id(&self) -> &[u8; 16] {
+        &self.system_id
+    }
+
     pub fn get_type(&self) -> BoxType {
         BoxType::PsshBox
     }

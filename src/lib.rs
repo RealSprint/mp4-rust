@@ -88,8 +88,10 @@ pub use reader::Mp4Reader;
 mod writer;
 pub use writer::{Mp4Config, Mp4Writer};
 
+pub mod encryption;
+
 pub mod cmaf;
-pub use cmaf::cmaf_chunk_writer::{CmafChunkWriter, };
+pub use cmaf::cmaf_chunk_writer::CmafChunkWriter;
 pub use cmaf::cmaf_header_writer::{CmafHeaderConfig, CmafHeaderWriter};
 
 pub fn read_mp4(f: File) -> Result<Mp4Reader<BufReader<File>>> {

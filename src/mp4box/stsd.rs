@@ -1,5 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use psuedo_boxes::visual_sample_entry::get_box_type;
 use serde::Serialize;
+use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
 
 use crate::av01::Av01Box;
@@ -38,6 +40,27 @@ pub struct StsdBox {
 impl StsdBox {
     pub fn get_type(&self) -> BoxType {
         BoxType::StsdBox
+    }
+
+    pub fn get_sinf(&self) -> Option<SinfBox> {
+        // TODO: Fix
+        if let Some(ref avc1) = self.avc1 {
+            avc1.sinf.clone()
+        } else if let Some(ref _hev1) = self.hev1 {
+            None
+        } else if let Some(ref _vp09) = self.vp09 {
+            None
+        } else if let Some(ref _av01) = self.av01 {
+            None
+        } else if let Some(ref _mp4a) = self.mp4a {
+            None
+        } else if let Some(ref _opus) = self.opus {
+            None
+        } else if let Some(ref _tx3g) = self.tx3g {
+            None
+        } else {
+            None
+        }
     }
 
     pub fn get_size(&self) -> u64 {
@@ -126,6 +149,24 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
             }
             BoxType::Tx3gBox => {
                 tx3g = Some(Tx3gBox::read_box(reader, s)?);
+            }
+            BoxType::EncvBox => {
+                let box_type = get_box_type(reader, size)?;
+                match box_type {
+                    BoxType::Avc1Box => {
+                        avc1 = Some(Avc1Box::read_box(reader, s)?);
+                    }
+                    BoxType::Hev1Box => {
+                        hev1 = Some(Hev1Box::read_box(reader, s)?);
+                    }
+                    BoxType::Vp09Box => {
+                        vp09 = Some(Vp09Box::read_box(reader, s)?);
+                    }
+                    BoxType::Av01Box => {
+                        av01 = Some(Av01Box::read_box(reader, s)?);
+                    }
+                    _ => {}
+                }
             }
             _ => {}
         }

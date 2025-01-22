@@ -1,6 +1,7 @@
 use bytes::BytesMut;
+use encryption::EncryptionConfig;
 use std::cmp;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::Duration;
 
@@ -24,6 +25,7 @@ pub struct TrackConfig {
     pub timescale: u32,
     pub language: String,
     pub media_conf: MediaConfig,
+    pub encryption: Option<EncryptionConfig>,
 }
 
 impl From<MediaConfig> for TrackConfig {
@@ -47,6 +49,7 @@ impl From<AvcConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AvcConfig(avc_conf),
+            encryption: None,
         }
     }
 }
@@ -58,6 +61,7 @@ impl From<HevcConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::HevcConfig(hevc_conf),
+            encryption: None,
         }
     }
 }
@@ -69,6 +73,7 @@ impl From<Av1Config> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::Av1Config(av1_conf),
+            encryption: None,
         }
     }
 }
@@ -80,6 +85,7 @@ impl From<AacConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AacConfig(aac_conf),
+            encryption: None,
         }
     }
 }
@@ -91,6 +97,7 @@ impl From<OpusConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::OpusConfig(opus_conf),
+            encryption: None,
         }
     }
 }
@@ -102,6 +109,7 @@ impl From<TtxtConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::TtxtConfig(txtt_conf),
+            encryption: None,
         }
     }
 }
@@ -113,6 +121,7 @@ impl From<Vp9Config> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::Vp9Config(vp9_conf),
+            encryption: None,
         }
     }
 }
@@ -136,6 +145,29 @@ impl Mp4Track {
             moof_offsets: Vec::new(),
             default_sample_duration: 0,
         }
+    }
+
+    pub fn get_encryption(&self) -> Result<Option<EncryptionConfig>> {
+        let sinf = self.trak.mdia.minf.stbl.stsd.get_sinf();
+
+        let Some(sinf) = sinf else {
+            return Ok(None);
+        };
+
+        let Some(schm) = sinf.schm else {
+            return Ok(None);
+        };
+
+        let Some(schi) = sinf.schi else {
+            return Ok(None);
+        };
+
+        // TODO: Fix error handling
+        let scheme_type = schm.scheme_type.try_into().unwrap();
+        let iv = schi.tenc.get_init_vector().unwrap();
+
+        // TODO: system id?
+        Ok(Some(EncryptionConfig::new(scheme_type, iv, [0; 16])))
     }
 
     pub fn track_id(&self) -> u32 {
@@ -827,7 +859,11 @@ impl Mp4TrackWriter {
                 let vmhd = VmhdBox::default();
                 trak.mdia.minf.vmhd = Some(vmhd);
 
-                let avc1 = Avc1Box::new(avc_config);
+                let mut avc1 = Avc1Box::new(avc_config);
+                if let Some(encryption) = &config.encryption {
+                    let sinf = encryption.clone().to_sinf(FourCC::from(*b"avc1"));
+                    avc1.sinf = Some(sinf);
+                }
                 trak.mdia.minf.stbl.stsd.avc1 = Some(avc1);
             }
             MediaConfig::HevcConfig(ref hevc_config) => {

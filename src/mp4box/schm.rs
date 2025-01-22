@@ -12,13 +12,13 @@ const SCHM_BOX_SIZE: u64 = HEADER_SIZE + HEADER_EXT_SIZE + 4 + 4;
 
 // ISO 14496-12:2022 - 8.12.6 Scheme Type Box
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-pub(crate) struct SchmBox {
-    pub(crate) version: u8,
-    pub(crate) flags: u32,
+pub struct SchmBox {
+    pub version: u8,
+    pub flags: u32,
 
-    pub(crate) scheme_type: FourCC,
-    pub(crate) scheme_version: u32,
-    pub(crate) scheme_uri: Option<String>,
+    pub scheme_type: FourCC,
+    pub scheme_version: u32,
+    pub scheme_uri: Option<String>,
 }
 
 impl SchmBox {
@@ -66,6 +66,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for SchmBox {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;
+        println!("reading version={}, flags={}", version, flags);
         let scheme_type: FourCC = reader.read_u32::<BigEndian>()?.into();
         let scheme_version = reader.read_u32::<BigEndian>()?;
 
@@ -104,6 +105,7 @@ impl<W: Write> WriteBox<&mut W> for SchmBox {
         let size = self.box_size();
 
         BoxHeader::new(self.box_type(), size).write(writer)?;
+        println!("writing version={}, flags={}", self.version, self.flags);
         write_box_header_ext(writer, self.version, self.flags)?;
 
         writer.write_u32::<BigEndian>(self.scheme_type.into())?;

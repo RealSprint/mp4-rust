@@ -38,6 +38,7 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
             minor_version: mp4_reader.minor_version(),
             compatible_brands: mp4_reader.compatible_brands().to_vec(),
             timescale: mp4_reader.timescale(),
+            encryption: mp4_reader.encryption(),
         },
     )?;
 
@@ -71,11 +72,15 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
             MediaType::OPUS => todo!(),
         };
 
+        // TODO: Fix error handling
+        let encryption = track.get_encryption().unwrap_or_default();
+
         let track_conf = TrackConfig {
             track_type: track.track_type()?,
             timescale: track.timescale(),
             language: track.language().to_string(),
             media_conf,
+            encryption,
         };
 
         mp4_writer.add_track(&track_conf)?;

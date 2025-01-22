@@ -12,6 +12,7 @@ fn main() -> mp4::Result<()> {
             str::parse("mp41").unwrap(),
         ],
         timescale: 1000,
+        encryption: None,
     };
 
     let data = Cursor::new(Vec::<u8>::new());

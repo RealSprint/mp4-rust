@@ -161,6 +161,7 @@ mod tests {
         let mut writer = CmafHeaderWriter::write_start(data, &config, None)?;
 
         writer.add_track(&TrackConfig {
+            encryption: None,
             track_type: TrackType::Video,
             timescale: 1000,
             language: "finne".to_string(),

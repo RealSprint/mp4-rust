@@ -12,9 +12,9 @@ use super::{
 // ISO 14496-12:2022 - 8.12.2 Protection Scheme Information Box
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct SinfBox {
-    frma: FrmaBox,
-    schi: Option<SchiBox>,
-    schm: Option<SchmBox>,
+    pub frma: FrmaBox,
+    pub schi: Option<SchiBox>,
+    pub schm: Option<SchmBox>,
 }
 
 impl SinfBox {

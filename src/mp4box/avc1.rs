@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
+use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
 
 use crate::{colr::ColrBox, mp4box::*, pasp::PaspBox};
@@ -20,6 +21,8 @@ pub struct Avc1Box {
     pub avcc: AvcCBox,
     pub colr: Option<ColrBox>,
     pub pasp: Option<PaspBox>,
+
+    pub sinf: Option<SinfBox>,
 }
 
 impl Default for Avc1Box {
@@ -35,6 +38,7 @@ impl Default for Avc1Box {
             avcc: AvcCBox::default(),
             colr: None,
             pasp: None,
+            sinf: None,
         }
     }
 }
@@ -60,15 +64,27 @@ impl Avc1Box {
                     numerator: *numerator,
                     denumerator: *denumerator,
                 }),
+            sinf: None,
         }
     }
 
+    pub fn is_encrypted(&self) -> bool {
+        self.sinf.is_some()
+    }
+
     pub fn get_type(&self) -> BoxType {
-        BoxType::Avc1Box
+        match self.is_encrypted() {
+            true => BoxType::EncvBox,
+            false => BoxType::Avc1Box,
+        }
     }
 
     pub fn get_size(&self) -> u64 {
-        let mut size = HEADER_SIZE + 8 + 70 + self.avcc.box_size();
+        let mut size = HEADER_SIZE
+            + 8
+            + 70
+            + self.avcc.box_size()
+            + self.sinf.as_ref().map_or(0, |sinf| sinf.box_size());
 
         if let Some(colr) = &self.colr {
             size += colr.box_size();
@@ -128,6 +144,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
         let mut avcc = None;
         let mut colr = None;
         let mut pasp = None;
+        let mut sinf = None;
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -151,6 +168,9 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
                 BoxType::PaspBox => {
                     pasp = Some(PaspBox::read_box(reader, s)?);
                 }
+                BoxType::SinfBox => {
+                    sinf = Some(SinfBox::read_box(reader, s)?);
+                }
                 _ => {
                     // XXX warn!()
                     skip_box(reader, s)?;
@@ -165,6 +185,8 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
             return Err(Error::InvalidData("avcc not found"));
         };
 
+        println!("encrypted: {:?}", sinf.is_some());
+
         Ok(Avc1Box {
             data_reference_index,
             width,
@@ -176,6 +198,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
             avcc,
             colr,
             pasp,
+            sinf,
         })
     }
 }
@@ -183,6 +206,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
 impl<W: Write> WriteBox<&mut W> for Avc1Box {
     fn write_box(&self, writer: &mut W) -> Result<u64> {
         let size = self.box_size();
+        println!("box_type: {}", self.box_type());
         BoxHeader::new(self.box_type(), size).write(writer)?;
 
         writer.write_u32::<BigEndian>(0)?; // reserved
@@ -211,6 +235,10 @@ impl<W: Write> WriteBox<&mut W> for Avc1Box {
 
         if let Some(pasp) = &self.pasp {
             pasp.write_box(writer)?;
+        }
+
+        if let Some(sinf) = &self.sinf {
+            sinf.write_box(writer)?;
         }
 
         Ok(size)
@@ -392,6 +420,7 @@ mod tests {
             },
             colr: None,
             pasp: None,
+            sinf: None,
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();

@@ -4,8 +4,9 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
 use super::{
-    box_start, read_box_header_ext, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error,
-    Mp4Box, ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
+    box_start, encryption::InitializationVector, read_box_header_ext, skip_bytes_to,
+    write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, ReadBox, Result, WriteBox,
+    HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
 // ISO 23001-7:2023 - 8.2 Track Encryption Box
@@ -84,6 +85,21 @@ impl TencBox {
             .unwrap_or(0) as u64;
 
         base_size + dynamic_size
+    }
+
+    // TODO: Include the type Kid/constant
+    pub fn get_init_vector(&self) -> Option<InitializationVector> {
+        if !self.default_is_protected {
+            return None;
+        }
+
+        match (self.default_constant_iv_size, self.default_constant_iv) {
+            (Some(size), Some(iv)) => Some(InitializationVector { size, data: iv }),
+            _ => Some(InitializationVector {
+                size: self.default_per_sample_iv_size,
+                data: self.default_kid,
+            }),
+        }
     }
 }
 
@@ -220,28 +236,10 @@ impl<W: Write> WriteBox<&mut W> for TencBox {
     }
 }
 
-pub struct InitializationVector {
-    size: u8,
-    data: [u8; 16],
-}
-
-impl InitializationVector {
-    pub fn new_64_bit(data: [u8; 8]) -> Self {
-        let mut iv = [0; 16];
-        iv[..8].copy_from_slice(&data);
-
-        InitializationVector { size: 8, data: iv }
-    }
-
-    pub fn new_128_bit(data: [u8; 16]) -> Self {
-        InitializationVector { size: 16, data }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mp4box::BoxHeader;
+    use crate::{encryption::InitializationVector, mp4box::BoxHeader};
     use std::io::Cursor;
 
     #[test]

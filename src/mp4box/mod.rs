@@ -92,9 +92,10 @@ pub mod opus;
 pub(crate) mod pasp;
 pub mod prft;
 pub mod pssh;
+pub(crate) mod psuedo_boxes;
 pub(crate) mod schi;
 pub(crate) mod schm;
-pub(crate) mod sinf;
+pub mod sinf;
 pub(crate) mod smhd;
 pub(crate) mod stbl;
 pub(crate) mod stco;
@@ -262,8 +263,8 @@ boxtype! {
     TencBox => 0x74656e63,
     PsshBox => 0x70737368,
     SchiBox => 0x73636869,
-    SinfBox => 0x73696e66
-
+    SinfBox => 0x73696e66,
+    EncvBox => 0x656e6376
 }
 
 pub trait Mp4Box: Sized {
