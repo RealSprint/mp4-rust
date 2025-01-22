@@ -42,8 +42,11 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
         },
     )?;
 
-    // TODO interleaving
-    for track in mp4_reader.tracks().values() {
+    let mut track_ids = mp4_reader.tracks().keys().cloned().collect::<Vec<u32>>();
+    track_ids.sort();
+
+    for track_id in track_ids.iter() {
+        let track = mp4_reader.tracks().get(track_id).unwrap();
         let media_conf = match track.media_type()? {
             MediaType::H264 => MediaConfig::AvcConfig(AvcConfig {
                 width: track.width(),
@@ -86,12 +89,12 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
         mp4_writer.add_track(&track_conf)?;
     }
 
-    for track_id in mp4_reader.tracks().keys().copied().collect::<Vec<u32>>() {
-        let sample_count = mp4_reader.sample_count(track_id)?;
+    for track_id in track_ids.iter() {
+        let sample_count = mp4_reader.sample_count(*track_id)?;
         for sample_idx in 0..sample_count {
             let sample_id = sample_idx + 1;
-            let sample = mp4_reader.read_sample(track_id, sample_id)?.unwrap();
-            mp4_writer.write_sample(track_id, &sample)?;
+            let sample = mp4_reader.read_sample(*track_id, sample_id)?.unwrap();
+            mp4_writer.write_sample(*track_id, &sample)?;
             // println!("copy {}:({})", sample_id, sample);
         }
     }
