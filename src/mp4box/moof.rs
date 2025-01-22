@@ -22,6 +22,7 @@ impl MoofBox {
         for traf in self.trafs.iter() {
             size += traf.box_size();
         }
+
         size
     }
 }
@@ -72,6 +73,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoofBox {
                     let traf = TrafBox::read_box(reader, s)?;
                     trafs.push(traf);
                 }
+
                 _ => {
                     // XXX warn!()
                     skip_box(reader, s)?;
@@ -102,6 +104,7 @@ impl<W: Write> WriteBox<&mut W> for MoofBox {
         for traf in self.trafs.iter() {
             traf.write_box(writer)?;
         }
+
         Ok(0)
     }
 }

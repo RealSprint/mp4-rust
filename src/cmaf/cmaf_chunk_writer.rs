@@ -152,6 +152,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             tfhd,
             tfdt: None,
             trun: None,
+            senc: None,
         };
 
         let mfhd = MfhdBox {

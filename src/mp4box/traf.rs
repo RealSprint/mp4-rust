@@ -1,3 +1,4 @@
+use senc::SencBox;
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
 
@@ -9,6 +10,8 @@ pub struct TrafBox {
     pub tfhd: TfhdBox,
     pub tfdt: Option<TfdtBox>,
     pub trun: Option<TrunBox>,
+
+    pub senc: Option<SencBox>,
 }
 
 impl TrafBox {
@@ -24,6 +27,9 @@ impl TrafBox {
         }
         if let Some(ref trun) = self.trun {
             size += trun.box_size();
+        }
+        if let Some(ref senc) = self.senc {
+            size += senc.box_size();
         }
         size
     }
@@ -55,6 +61,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
         let mut tfhd = None;
         let mut tfdt = None;
         let mut trun = None;
+        let mut senc = None;
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -78,6 +85,9 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
                 BoxType::TrunBox => {
                     trun = Some(TrunBox::read_box(reader, s)?);
                 }
+                BoxType::SencBox => {
+                    senc = Some(SencBox::read_box(reader, s)?);
+                }
                 _ => {
                     // XXX warn!()
                     skip_box(reader, s)?;
@@ -97,6 +107,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
             tfhd: tfhd.unwrap(),
             tfdt,
             trun,
+            senc,
         })
     }
 }
@@ -114,6 +125,10 @@ impl<W: Write> WriteBox<&mut W> for TrafBox {
 
         for trun in self.trun.iter() {
             trun.write_box(writer)?;
+        }
+
+        if let Some(ref senc) = self.senc {
+            senc.write_box(writer)?;
         }
 
         Ok(size)
