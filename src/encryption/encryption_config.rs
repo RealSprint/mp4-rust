@@ -5,7 +5,7 @@ use crate::{
     FourCC,
 };
 
-use super::initilization_vector::InitializationVector;
+use super::initialization_vector::InitializationVector;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EncryptionSchemeType {

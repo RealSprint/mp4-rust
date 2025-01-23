@@ -4,7 +4,7 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
 use super::{
-    box_start, encryption::initilization_vector::InitializationVector, read_box_header_ext,
+    box_start, encryption::initialization_vector::InitializationVector, read_box_header_ext,
     skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, ReadBox, Result,
     WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };

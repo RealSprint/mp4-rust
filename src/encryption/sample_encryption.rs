@@ -2,7 +2,7 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct SampleEncryption {
-    pub iv: [u8; 16],
+    pub initialization_vector: [u8; 16],
     pub sub_samples: Vec<SubSampleEncryption>,
 }
 

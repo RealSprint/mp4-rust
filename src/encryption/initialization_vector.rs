@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, PartialEq, Eq)]
+use serde::Serialize;
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct InitializationVector {
     pub(crate) size: u8,
     pub(crate) data: [u8; 16],
