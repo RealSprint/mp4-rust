@@ -110,7 +110,7 @@ fn read_version0<R: Read + Seek>(
 
     let mut ivs = Vec::new();
     for _ in 0..sample_count {
-        // TODO: Is this really always 16, or can it be 8?
+        // TODO: This is not always 16 bytes. Can be 8 as well. Information to determine this is in 'senc' box.
         let mut iv = [0; 16];
         reader.read_exact(&mut iv)?;
 
