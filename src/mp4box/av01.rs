@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
+use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
 use tracing::debug;
 
@@ -21,6 +22,7 @@ pub struct Av01Box {
     pub av1c: Av1CBox,
     pub colr: Option<ColrBox>,
     pub pasp: Option<PaspBox>,
+    pub sinf: Option<SinfBox>,
 }
 
 impl Default for Av01Box {
@@ -36,6 +38,7 @@ impl Default for Av01Box {
             av1c: Av1CBox::default(),
             colr: None,
             pasp: None,
+            sinf: None,
         }
     }
 }
@@ -61,6 +64,7 @@ impl Av01Box {
                     numerator: *numerator,
                     denumerator: *denumerator,
                 }),
+            sinf: None,
         }
     }
 
@@ -77,6 +81,10 @@ impl Av01Box {
 
         if let Some(pasp) = &self.pasp {
             size += pasp.box_size();
+        }
+
+        if let Some(sinf) = &self.sinf {
+            size += sinf.box_size();
         }
 
         size
@@ -130,11 +138,11 @@ impl<R: Read + Seek> ReadBox<&mut R> for Av01Box {
         let mut av1c = None;
         let mut colr = None;
         let mut pasp = None;
+        let mut sinf = None;
 
         let mut current = reader.stream_position()?;
         let end = start + size;
         while current < end {
-            // Get box header.
             let header = BoxHeader::read(reader)?;
             let BoxHeader { name, size: s } = header;
             if s > size {
@@ -152,6 +160,9 @@ impl<R: Read + Seek> ReadBox<&mut R> for Av01Box {
                 }
                 BoxType::PaspBox => {
                     pasp = Some(PaspBox::read_box(reader, s)?);
+                }
+                BoxType::SinfBox => {
+                    sinf = Some(SinfBox::read_box(reader, s)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -178,6 +189,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Av01Box {
             av1c,
             colr,
             pasp,
+            sinf,
         })
     }
 }
@@ -213,6 +225,10 @@ impl<W: Write> WriteBox<&mut W> for Av01Box {
 
         if let Some(pasp) = &self.pasp {
             pasp.write_box(writer)?;
+        }
+
+        if let Some(sinf) = &self.sinf {
+            sinf.write_box(writer)?;
         }
 
         Ok(size)
@@ -384,6 +400,7 @@ mod tests {
                 numerator: 16,
                 denumerator: 9,
             }),
+            sinf: Some(SinfBox::default()),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();

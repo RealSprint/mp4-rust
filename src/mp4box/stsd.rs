@@ -50,8 +50,8 @@ impl StsdBox {
             hev1.sinf.clone()
         } else if let Some(ref _vp09) = self.vp09 {
             None
-        } else if let Some(ref _av01) = self.av01 {
-            None
+        } else if let Some(ref av01) = self.av01 {
+            av01.sinf.clone()
         } else if let Some(ref _mp4a) = self.mp4a {
             None
         } else if let Some(ref _opus) = self.opus {
