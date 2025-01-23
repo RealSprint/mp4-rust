@@ -3,6 +3,7 @@ use psuedo_boxes::visual_sample_entry::get_box_type;
 use serde::Serialize;
 use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
+use tracing::warn;
 
 use crate::av01::Av01Box;
 use crate::mp4box::vp09::Vp09Box;
@@ -165,7 +166,25 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
                     BoxType::Av01Box => {
                         av01 = Some(Av01Box::read_box(reader, s)?);
                     }
-                    _ => {}
+                    _ => {
+                        warn!("Unknown box type found in encv: {:?}", box_type);
+                    }
+                }
+            }
+            BoxType::EncaBox => {
+                let box_type = get_box_type(reader, size)?;
+
+                match box_type {
+                    BoxType::Mp4aBox => {
+                        mp4a = Some(Mp4aBox::read_box(reader, s)?);
+                    }
+                    BoxType::OpusBox => {
+                        opus = Some(OpusBox::read_box(reader, s)?);
+                    }
+
+                    _ => {
+                        warn!("Unknown box type found in enca: {:?}", box_type);
+                    }
                 }
             }
             _ => {}
