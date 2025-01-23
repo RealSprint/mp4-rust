@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::io::{Read, Seek};
 use std::time::Duration;
 
-use encryption::EncryptionConfig;
+use encryption::encryption_config::EncryptionConfig;
 use prft::PrftBox;
 
 use crate::meta::MetaBox;
@@ -125,7 +125,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
                         track.moof_offsets.push(moof_offset);
                         track.trafs.push(traf.clone());
                         if let Some(senc) = traf.senc.as_ref() {
-                            track.add_encryption_data(senc.ivs.clone());
+                            track.add_encryption_data(senc.sample_encryption.clone());
                         }
                     } else {
                         return Err(Error::TrakNotFound(track_id));
@@ -231,7 +231,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
                     track.trafs.push(traf.clone());
 
                     if let Some(senc) = traf.senc.as_ref() {
-                        track.add_encryption_data(senc.ivs.clone());
+                        track.add_encryption_data(senc.sample_encryption.clone());
                     }
                 } else {
                     return Err(Error::TrakNotFound(track_id));

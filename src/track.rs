@@ -1,6 +1,6 @@
 use bytes::BytesMut;
-use encryption::EncryptionConfig;
-use senc::SencData;
+use encryption::encryption_config::EncryptionConfig;
+use encryption::sample_encryption::SampleEncryption;
 use std::cmp;
 use std::collections::VecDeque;
 use std::convert::{TryFrom, TryInto};
@@ -136,7 +136,7 @@ pub struct Mp4Track {
 
     // Fragmented Tracks Defaults.
     pub default_sample_duration: u32,
-    encryption_data: VecDeque<SencData>,
+    encryption_data: VecDeque<SampleEncryption>,
 }
 
 impl Mp4Track {
@@ -151,7 +151,7 @@ impl Mp4Track {
         }
     }
 
-    pub fn add_encryption_data(&mut self, data: Vec<SencData>) {
+    pub fn add_encryption_data(&mut self, data: Vec<SampleEncryption>) {
         self.encryption_data.extend(data);
     }
 
@@ -833,7 +833,7 @@ impl Mp4Track {
             rendering_offset,
             is_sync,
             bytes: Bytes::from(buffer),
-            encryption_data,
+            encryption: encryption_data,
         }))
     }
 }

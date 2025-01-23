@@ -4,8 +4,10 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
 use super::{
-    box_start, read_box_header_ext, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error,
-    Mp4Box, ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
+    box_start,
+    encryption::sample_encryption::{SampleEncryption, SubSampleEncryption},
+    read_box_header_ext, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box,
+    ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
 // ISO 23001-7:2023 - 7.2.1 Sample Encryption Box
@@ -16,7 +18,7 @@ pub struct SencBox {
 
     sample_count: u32,
 
-    pub(crate) ivs: Vec<SencData>,
+    pub(crate) sample_encryption: Vec<SampleEncryption>,
 }
 
 impl SencBox {
@@ -25,12 +27,12 @@ impl SencBox {
             version: 0,
             use_sub_samples,
             sample_count: 0,
-            ivs: Vec::new(),
+            sample_encryption: Vec::new(),
         }
     }
 
-    pub fn add_iv(&mut self, senc_data: SencData) {
-        self.ivs.push(senc_data);
+    pub fn add_iv(&mut self, senc_data: SampleEncryption) {
+        self.sample_encryption.push(senc_data);
         self.sample_count += 1;
     }
 
@@ -40,11 +42,11 @@ impl SencBox {
 
     pub fn get_size(&self) -> u64 {
         let iv_size = self
-            .ivs
+            .sample_encryption
             .iter()
-            .map(|iv| {
+            .map(|e| {
                 16 + if self.use_sub_samples {
-                    2 + iv.sub_samples.len() as u64 * 6
+                    2 + e.sub_samples().len() as u64 * 6
                 } else {
                     0
                 }
@@ -120,33 +122,21 @@ fn read_version0<R: Read + Seek>(
                 let clear_data = reader.read_u16::<BigEndian>()?;
                 let encrypted_data = reader.read_u32::<BigEndian>()?;
 
-                sub_samples.push(SubSample {
+                sub_samples.push(SubSampleEncryption {
                     clear_data,
                     encrypted_data,
                 });
             }
         }
-        ivs.push(SencData { iv, sub_samples });
+        ivs.push(SampleEncryption { iv, sub_samples });
     }
 
     Ok(SencBox {
         sample_count,
         version: 0,
-        ivs,
+        sample_encryption: ivs,
         use_sub_samples,
     })
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-pub struct SencData {
-    iv: [u8; 16],
-    sub_samples: Vec<SubSample>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-struct SubSample {
-    clear_data: u16,
-    encrypted_data: u32,
 }
 
 fn read_version1<R: Read + Seek>(_reader: &mut R, _size: u64) -> Result<SencBox> {
@@ -181,7 +171,7 @@ impl<W: Write> WriteBox<&mut W> for SencBox {
 
 fn write_version0<W: Write>(writer: &mut W, senc: &SencBox) -> Result<()> {
     writer.write_u32::<BigEndian>(senc.sample_count)?;
-    for iv in &senc.ivs {
+    for iv in &senc.sample_encryption {
         writer.write_all(&iv.iv)?;
 
         if senc.use_sub_samples {
@@ -214,23 +204,23 @@ mod tests {
             sample_count: 2,
             version: 0,
             use_sub_samples: true,
-            ivs: vec![
-                SencData {
+            sample_encryption: vec![
+                SampleEncryption {
                     iv: [
                         0xe8, 0x6b, 0x4c, 0xa8, 0xae, 0x2c, 0x3f, 0xbd, //
                         0x88, 0x07, 0x41, 0x4f, 0x2a, 0xdf, 0x5a, 0xcc, //
                     ],
-                    sub_samples: vec![SubSample {
+                    sub_samples: vec![SubSampleEncryption {
                         clear_data: 773,
                         encrypted_data: 19472,
                     }],
                 },
-                SencData {
+                SampleEncryption {
                     iv: [
                         0xe8, 0x6b, 0x4c, 0xa8, 0xae, 0x2c, 0x3f, 0xbd, //
                         0x88, 0x07, 0x41, 0x4f, 0x2a, 0xdf, 0x5f, 0x8d, //
                     ],
-                    sub_samples: vec![SubSample {
+                    sub_samples: vec![SubSampleEncryption {
                         clear_data: 19,
                         encrypted_data: 5632,
                     }],

@@ -1,5 +1,5 @@
 use byteorder::{BigEndian, WriteBytesExt};
-use encryption::EncryptionConfig;
+use encryption::encryption_config::EncryptionConfig;
 use std::io::{Seek, SeekFrom, Write};
 
 use crate::mp4box::*;

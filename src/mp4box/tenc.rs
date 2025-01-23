@@ -4,9 +4,9 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
 use super::{
-    box_start, encryption::InitializationVector, read_box_header_ext, skip_bytes_to,
-    write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, ReadBox, Result, WriteBox,
-    HEADER_EXT_SIZE, HEADER_SIZE,
+    box_start, encryption::initilization_vector::InitializationVector, read_box_header_ext,
+    skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, ReadBox, Result,
+    WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
 // ISO 23001-7:2023 - 8.2 Track Encryption Box
@@ -239,7 +239,7 @@ impl<W: Write> WriteBox<&mut W> for TencBox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{encryption::InitializationVector, mp4box::BoxHeader};
+    use crate::mp4box::BoxHeader;
     use std::io::Cursor;
 
     #[test]
