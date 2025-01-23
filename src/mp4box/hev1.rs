@@ -462,7 +462,7 @@ mod tests {
 
         let mut reader = Cursor::new(&buf);
         let header = BoxHeader::read(&mut reader).unwrap();
-        assert_eq!(header.name, BoxType::Hev1Box);
+        assert_eq!(header.name, BoxType::EncvBox);
         assert_eq!(src_box.box_size(), header.size);
 
         let dst_box = Hev1Box::read_box(&mut reader, header.size).unwrap();

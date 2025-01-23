@@ -407,7 +407,7 @@ mod tests {
                 numerator: 16,
                 denumerator: 9,
             }),
-            sinf: Some(SinfBox::default()),
+            sinf: None,
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -416,6 +416,45 @@ mod tests {
         let mut reader = Cursor::new(&buf);
         let header = BoxHeader::read(&mut reader).unwrap();
         assert_eq!(header.name, BoxType::Av01Box);
+        assert_eq!(src_box.box_size(), header.size);
+
+        let dst_box = Av01Box::read_box(&mut reader, header.size).unwrap();
+        assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_av01_with_sinf() {
+        let src_box = Av01Box {
+            data_reference_index: 1,
+            width: 320,
+            height: 240,
+            horizresolution: FixedPointU16::new(0x48),
+            vertresolution: FixedPointU16::new(0x48),
+            frame_count: 1,
+            depth: 24,
+            av1c: Av1CBox {
+                tier: 0,
+                profile: 0,
+                level_idx: 8,
+                bit_depth: 8,
+                monochrome: false,
+                subsampling_x: 1,
+                subsampling_y: 1,
+                chroma_sample_position: 0,
+                initial_presentation_delay_minus_one: None,
+                sequence_header: vec![10, 11, 0, 0, 0, 66, 167, 191, 230, 46, 223, 200, 66],
+            },
+            colr: None,
+            pasp: None,
+            sinf: Some(SinfBox::default()),
+        };
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+        assert_eq!(buf.len(), src_box.box_size() as usize);
+
+        let mut reader = Cursor::new(&buf);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::EncvBox);
         assert_eq!(src_box.box_size(), header.size);
 
         let dst_box = Av01Box::read_box(&mut reader, header.size).unwrap();
