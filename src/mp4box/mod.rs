@@ -266,6 +266,7 @@ boxtype! {
     SchiBox => 0x73636869,
     SinfBox => 0x73696e66,
     EncvBox => 0x656e6376,
+    EncaBox => 0x656e6361,
     SencBox => 0x73656e63
 }
 

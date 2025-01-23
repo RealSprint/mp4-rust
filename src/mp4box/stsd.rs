@@ -52,8 +52,8 @@ impl StsdBox {
             None
         } else if let Some(ref av01) = self.av01 {
             av01.sinf.clone()
-        } else if let Some(ref _mp4a) = self.mp4a {
-            None
+        } else if let Some(ref mp4a) = self.mp4a {
+            mp4a.sinf.clone()
         } else if let Some(ref _opus) = self.opus {
             None
         } else if let Some(ref _tx3g) = self.tx3g {
