@@ -66,7 +66,6 @@ impl<R: Read + Seek> ReadBox<&mut R> for SchmBox {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;
-        println!("reading version={}, flags={}", version, flags);
         let scheme_type: FourCC = reader.read_u32::<BigEndian>()?.into();
         let scheme_version = reader.read_u32::<BigEndian>()?;
 
@@ -105,7 +104,6 @@ impl<W: Write> WriteBox<&mut W> for SchmBox {
         let size = self.box_size();
 
         BoxHeader::new(self.box_type(), size).write(writer)?;
-        println!("writing version={}, flags={}", self.version, self.flags);
         write_box_header_ext(writer, self.version, self.flags)?;
 
         writer.write_u32::<BigEndian>(self.scheme_type.into())?;

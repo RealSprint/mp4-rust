@@ -185,8 +185,6 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
             return Err(Error::InvalidData("avcc not found"));
         };
 
-        println!("encrypted: {:?}", sinf.is_some());
-
         Ok(Avc1Box {
             data_reference_index,
             width,
@@ -206,7 +204,6 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
 impl<W: Write> WriteBox<&mut W> for Avc1Box {
     fn write_box(&self, writer: &mut W) -> Result<u64> {
         let size = self.box_size();
-        println!("box_type: {}", self.box_type());
         BoxHeader::new(self.box_type(), size).write(writer)?;
 
         writer.write_u32::<BigEndian>(0)?; // reserved

@@ -825,12 +825,6 @@ impl Mp4Track {
         let rendering_offset = self.sample_rendering_offset(sample_id);
         let is_sync = self.is_sync_sample(sample_id);
 
-        println!(
-            "read sample id: {}, size: {}, encryption samples: {}",
-            sample_id,
-            sample_size,
-            self.encryption_data.len()
-        );
         let encryption_data = self.encryption_data.pop_front();
 
         Ok(Some(Mp4Sample {

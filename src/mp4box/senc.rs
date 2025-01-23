@@ -106,8 +106,6 @@ fn read_version0<R: Read + Seek>(
 ) -> Result<SencBox> {
     let sample_count = reader.read_u32::<BigEndian>()?;
 
-    println!("sample_count: {}", sample_count);
-
     let mut ivs = Vec::new();
     for _ in 0..sample_count {
         // TODO: Is this really always 16, or can it be 8?
