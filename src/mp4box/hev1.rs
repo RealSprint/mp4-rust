@@ -55,8 +55,15 @@ impl Hev1Box {
         }
     }
 
+    pub fn is_encrypted(&self) -> bool {
+        self.sinf.is_some()
+    }
+
     pub fn get_type(&self) -> BoxType {
-        BoxType::Hev1Box
+        match self.is_encrypted() {
+            true => BoxType::EncvBox,
+            false => BoxType::Hev1Box,
+        }
     }
 
     pub fn get_size(&self) -> u64 {
