@@ -1,6 +1,7 @@
 use pssh::PsshBox;
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::meta::MetaBox;
 use crate::mp4box::*;
@@ -116,7 +117,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoovBox {
                     pssh = Some(PsshBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

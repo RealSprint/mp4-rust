@@ -1,6 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::{colr::ColrBox, mp4box::*, pasp::PaspBox};
 
@@ -153,7 +154,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Av01Box {
                     pasp = Some(PaspBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

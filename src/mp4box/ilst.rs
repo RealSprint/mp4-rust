@@ -4,6 +4,7 @@ use std::io::{Read, Seek};
 
 use byteorder::ByteOrder;
 use serde::Serialize;
+use tracing::debug;
 
 use crate::mp4box::data::DataBox;
 use crate::mp4box::*;
@@ -78,7 +79,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for IlstBox {
                     items.insert(MetadataKey::Summary, IlstItemBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }
@@ -145,7 +146,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for IlstItemBox {
                     data = Some(DataBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

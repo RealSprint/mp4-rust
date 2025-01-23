@@ -1,6 +1,7 @@
 use std::io::{Read, Seek};
 
 use serde::Serialize;
+use tracing::debug;
 
 use crate::mp4box::meta::MetaBox;
 use crate::mp4box::*;
@@ -66,7 +67,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for UdtaBox {
                     meta = Some(MetaBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

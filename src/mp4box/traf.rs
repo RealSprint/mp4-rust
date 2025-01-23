@@ -1,6 +1,7 @@
 use senc::SencBox;
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::mp4box::*;
 use crate::mp4box::{tfdt::TfdtBox, tfhd::TfhdBox, trun::TrunBox};
@@ -89,7 +90,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
                     senc = Some(SencBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

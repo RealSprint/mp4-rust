@@ -1,6 +1,7 @@
 use std::io::{Read, Seek, Write};
 
 use serde::Serialize;
+use tracing::debug;
 
 use crate::skip_box;
 
@@ -79,7 +80,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for SinfBox {
                     schm = Some(SchmBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // TODO: Log box type
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

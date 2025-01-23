@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use encryption::encryption_config::EncryptionConfig;
 use prft::PrftBox;
+use tracing::debug;
 
 use crate::meta::MetaBox;
 use crate::*;
@@ -77,7 +78,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
                     prfts.push(emsg);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(&mut reader, s)?;
                 }
             }
@@ -194,7 +195,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
                     moof_offsets.push(moof_offset);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(&mut reader, s)?;
                 }
             }

@@ -1,6 +1,7 @@
 use std::io::{Read, Seek};
 
 use serde::Serialize;
+use tracing::debug;
 
 use crate::mp4box::hdlr::HdlrBox;
 use crate::mp4box::ilst::IlstBox;
@@ -122,7 +123,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MetaBox {
                     hdlr = Some(HdlrBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }
@@ -152,7 +153,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MetaBox {
                             ilst = Some(IlstBox::read_box(reader, s)?);
                         }
                         _ => {
-                            // XXX warn!()
+                            debug!("Skipping box: {:?}", name);
                             skip_box(reader, s)?;
                         }
                     }

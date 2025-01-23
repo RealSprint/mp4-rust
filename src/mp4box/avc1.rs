@@ -2,6 +2,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::{colr::ColrBox, mp4box::*, pasp::PaspBox};
 
@@ -172,7 +173,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
                     sinf = Some(SinfBox::read_box(reader, s)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }
