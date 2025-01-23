@@ -5,7 +5,10 @@ use serde::Serialize;
 
 use super::{
     box_start,
-    encryption::sample_encryption::{SampleEncryption, SubSampleEncryption},
+    encryption::{
+        initialization_vector::InitializationVector,
+        sample_encryption::{SampleEncryption, SubSampleEncryption},
+    },
     read_box_header_ext, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box,
     ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
@@ -129,7 +132,7 @@ fn read_version0<R: Read + Seek>(
             }
         }
         ivs.push(SampleEncryption {
-            initialization_vector: iv,
+            initialization_vector: InitializationVector::new_128_bit(iv),
             sub_samples,
         });
     }
@@ -175,7 +178,7 @@ impl<W: Write> WriteBox<&mut W> for SencBox {
 fn write_version0<W: Write>(writer: &mut W, senc: &SencBox) -> Result<()> {
     writer.write_u32::<BigEndian>(senc.sample_count)?;
     for iv in &senc.sample_encryption {
-        writer.write_all(&iv.initialization_vector)?;
+        writer.write_all(&iv.initialization_vector.data)?;
 
         if senc.use_sub_samples {
             writer.write_u16::<BigEndian>(iv.sub_samples.len() as u16)?;
@@ -198,7 +201,7 @@ fn write_version2<W: Write>(_writer: &mut W, _senc: &SencBox) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mp4box::BoxHeader;
+    use crate::{encryption::initialization_vector::InitializationVector, mp4box::BoxHeader};
     use std::io::Cursor;
 
     #[test]
@@ -209,20 +212,20 @@ mod tests {
             use_sub_samples: true,
             sample_encryption: vec![
                 SampleEncryption {
-                    initialization_vector: [
+                    initialization_vector: InitializationVector::new_128_bit([
                         0xe8, 0x6b, 0x4c, 0xa8, 0xae, 0x2c, 0x3f, 0xbd, //
                         0x88, 0x07, 0x41, 0x4f, 0x2a, 0xdf, 0x5a, 0xcc, //
-                    ],
+                    ]),
                     sub_samples: vec![SubSampleEncryption {
                         clear_data: 773,
                         encrypted_data: 19472,
                     }],
                 },
                 SampleEncryption {
-                    initialization_vector: [
+                    initialization_vector: InitializationVector::new_128_bit([
                         0xe8, 0x6b, 0x4c, 0xa8, 0xae, 0x2c, 0x3f, 0xbd, //
                         0x88, 0x07, 0x41, 0x4f, 0x2a, 0xdf, 0x5f, 0x8d, //
-                    ],
+                    ]),
                     sub_samples: vec![SubSampleEncryption {
                         clear_data: 19,
                         encrypted_data: 5632,

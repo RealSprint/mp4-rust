@@ -1,8 +1,10 @@
 use serde::Serialize;
 
+use super::initialization_vector::InitializationVector;
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct SampleEncryption {
-    pub initialization_vector: [u8; 16],
+    pub initialization_vector: InitializationVector,
     pub sub_samples: Vec<SubSampleEncryption>,
 }
 
