@@ -123,7 +123,10 @@ impl<R: Read + Seek> Mp4Reader<R> {
                     if let Some(track) = tracks.get_mut(&track_id) {
                         track.default_sample_duration = default_sample_duration;
                         track.moof_offsets.push(moof_offset);
-                        track.trafs.push(traf.clone())
+                        track.trafs.push(traf.clone());
+                        if let Some(senc) = traf.senc.as_ref() {
+                            track.add_encryption_data(senc.ivs.clone());
+                        }
                     } else {
                         return Err(Error::TrakNotFound(track_id));
                     }
@@ -225,7 +228,11 @@ impl<R: Read + Seek> Mp4Reader<R> {
                 if let Some(track) = tracks.get_mut(&track_id) {
                     track.default_sample_duration = *default_sample_duration;
                     track.moof_offsets.push(moof_offset);
-                    track.trafs.push(traf.clone())
+                    track.trafs.push(traf.clone());
+
+                    if let Some(senc) = traf.senc.as_ref() {
+                        track.add_encryption_data(senc.ivs.clone());
+                    }
                 } else {
                     return Err(Error::TrakNotFound(track_id));
                 }
@@ -292,7 +299,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
     }
 
     pub fn read_sample(&mut self, track_id: u32, sample_id: u32) -> Result<Option<Mp4Sample>> {
-        if let Some(track) = self.tracks.get(&track_id) {
+        if let Some(track) = self.tracks.get_mut(&track_id) {
             track.read_sample(&mut self.reader, sample_id)
         } else {
             Err(Error::TrakNotFound(track_id))

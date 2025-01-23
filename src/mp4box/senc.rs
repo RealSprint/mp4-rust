@@ -16,10 +16,24 @@ pub struct SencBox {
 
     sample_count: u32,
 
-    ivs: Vec<SencData>,
+    pub(crate) ivs: Vec<SencData>,
 }
 
 impl SencBox {
+    pub fn new(use_sub_samples: bool) -> Self {
+        Self {
+            version: 0,
+            use_sub_samples,
+            sample_count: 0,
+            ivs: Vec::new(),
+        }
+    }
+
+    pub fn add_iv(&mut self, senc_data: SencData) {
+        self.ivs.push(senc_data);
+        self.sample_count += 1;
+    }
+
     pub fn get_type(&self) -> BoxType {
         BoxType::SencBox
     }
@@ -126,7 +140,7 @@ fn read_version0<R: Read + Seek>(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
-struct SencData {
+pub struct SencData {
     iv: [u8; 16],
     sub_samples: Vec<SubSample>,
 }

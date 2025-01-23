@@ -1,6 +1,8 @@
 use bytes::BytesMut;
 use encryption::EncryptionConfig;
+use senc::SencData;
 use std::cmp;
+use std::collections::VecDeque;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::Duration;
@@ -134,6 +136,7 @@ pub struct Mp4Track {
 
     // Fragmented Tracks Defaults.
     pub default_sample_duration: u32,
+    encryption_data: VecDeque<SencData>,
 }
 
 impl Mp4Track {
@@ -144,7 +147,12 @@ impl Mp4Track {
             trafs: Vec::new(),
             moof_offsets: Vec::new(),
             default_sample_duration: 0,
+            encryption_data: VecDeque::new(),
         }
+    }
+
+    pub fn add_encryption_data(&mut self, data: Vec<SencData>) {
+        self.encryption_data.extend(data);
     }
 
     pub fn get_encryption(&self) -> Result<Option<EncryptionConfig>> {
@@ -794,7 +802,7 @@ impl Mp4Track {
     }
 
     pub(crate) fn read_sample<R: Read + Seek>(
-        &self,
+        &mut self,
         reader: &mut R,
         sample_id: u32,
     ) -> Result<Option<Mp4Sample>> {
@@ -817,12 +825,21 @@ impl Mp4Track {
         let rendering_offset = self.sample_rendering_offset(sample_id);
         let is_sync = self.is_sync_sample(sample_id);
 
+        println!(
+            "read sample id: {}, size: {}, encryption samples: {}",
+            sample_id,
+            sample_size,
+            self.encryption_data.len()
+        );
+        let encryption_data = self.encryption_data.pop_front();
+
         Ok(Some(Mp4Sample {
             start_time,
             duration,
             rendering_offset,
             is_sync,
             bytes: Bytes::from(buffer),
+            encryption_data,
         }))
     }
 }

@@ -1,3 +1,4 @@
+use senc::SencData;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -691,6 +692,7 @@ pub struct Mp4Sample {
     pub rendering_offset: i32,
     pub is_sync: bool,
     pub bytes: Bytes,
+    pub encryption_data: Option<SencData>,
 }
 
 impl PartialEq for Mp4Sample {

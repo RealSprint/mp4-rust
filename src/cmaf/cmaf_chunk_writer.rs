@@ -267,6 +267,11 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             trun.flags |= TrunBox::FLAG_SAMPLE_CTS;
         }
 
+        if let Some(data) = sample.encryption_data.as_ref() {
+            let senc = self.traf.senc.get_or_insert(senc::SencBox::new(true));
+            senc.add_iv(data.clone());
+        }
+
         let duration: u32 = trun.duration();
         Ok(duration as u64)
     }
@@ -343,6 +348,7 @@ mod tests {
             rendering_offset: 10,
             is_sync: true,
             bytes: Bytes::from_static(&[0, 0, 0, 0, 0, 0, 0]),
+            encryption_data: None,
         })?;
 
         writer.write_end(1)?;
