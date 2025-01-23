@@ -46,8 +46,8 @@ impl StsdBox {
         // TODO: Fix
         if let Some(ref avc1) = self.avc1 {
             avc1.sinf.clone()
-        } else if let Some(ref _hev1) = self.hev1 {
-            None
+        } else if let Some(ref hev1) = self.hev1 {
+            hev1.sinf.clone()
         } else if let Some(ref _vp09) = self.vp09 {
             None
         } else if let Some(ref _av01) = self.av01 {
