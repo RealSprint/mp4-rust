@@ -123,7 +123,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
             let BoxHeader { name, size: s } = header;
             if s > size {
                 return Err(Error::InvalidData(
-                    "av01 box contains a box with a larger size than it",
+                    "mp4a box contains a box with a larger size than it",
                 ));
             }
 
