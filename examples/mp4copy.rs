@@ -75,7 +75,6 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
             MediaType::OPUS => todo!(),
         };
 
-        // TODO: Fix error handling
         let encryption = track.get_encryption().unwrap_or_default();
 
         let track_conf = TrackConfig {
