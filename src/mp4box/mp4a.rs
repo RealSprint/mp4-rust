@@ -16,7 +16,7 @@ pub struct Mp4aBox {
     pub samplerate: FixedPointU16,
     pub esds: Option<EsdsBox>,
 
-    pub sinf: Option<SinfBox>,
+    pub sinf: Vec<SinfBox>,
 }
 
 impl Default for Mp4aBox {
@@ -27,7 +27,7 @@ impl Default for Mp4aBox {
             samplesize: 16,
             samplerate: FixedPointU16::new(48000),
             esds: Some(EsdsBox::default()),
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -40,12 +40,12 @@ impl Mp4aBox {
             samplesize: 16,
             samplerate: FixedPointU16::new(config.freq_index.freq() as u16),
             esds: Some(EsdsBox::new(config)),
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.sinf.is_some()
+        !self.sinf.is_empty()
     }
 
     pub fn get_type(&self) -> BoxType {
@@ -60,9 +60,8 @@ impl Mp4aBox {
         if let Some(ref esds) = self.esds {
             size += esds.box_size();
         }
-        if let Some(ref sinf) = self.sinf {
-            size += sinf.box_size();
-        }
+
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
 
         size
     }
@@ -114,7 +113,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
         }
 
         let mut esds = None;
-        let mut sinf = None;
+        let mut sinf = Vec::new();
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -132,7 +131,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
                     esds = Some(EsdsBox::read_box(reader, s)?);
                 }
                 BoxType::SinfBox => {
-                    sinf = Some(SinfBox::read_box(reader, s)?);
+                    sinf.push(SinfBox::read_box(reader, s)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -174,7 +173,7 @@ impl<W: Write> WriteBox<&mut W> for Mp4aBox {
             esds.write_box(writer)?;
         }
 
-        if let Some(ref sinf) = self.sinf {
+        for sinf in &self.sinf {
             sinf.write_box(writer)?;
         }
 
@@ -669,7 +668,7 @@ mod tests {
                     sl_config: SLConfigDescriptor::default(),
                 },
             }),
-            sinf: None,
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -692,7 +691,7 @@ mod tests {
             samplesize: 16,
             samplerate: FixedPointU16::new(48000),
             esds: None,
-            sinf: None,
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -715,7 +714,7 @@ mod tests {
             samplesize: 16,
             samplerate: FixedPointU16::new(48000),
             esds: None,
-            sinf: Some(SinfBox::default()),
+            sinf: vec![SinfBox::default()],
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();

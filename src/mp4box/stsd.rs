@@ -44,19 +44,19 @@ impl StsdBox {
     }
 
     pub fn get_sinf(&self) -> Option<SinfBox> {
-        // TODO: Fix
+        // TODO: Fix vector
         if let Some(ref avc1) = self.avc1 {
-            avc1.sinf.clone()
+            avc1.sinf.first().cloned()
         } else if let Some(ref hev1) = self.hev1 {
-            hev1.sinf.clone()
+            hev1.sinf.first().cloned()
         } else if let Some(ref _vp09) = self.vp09 {
             None
         } else if let Some(ref av01) = self.av01 {
-            av01.sinf.clone()
+            av01.sinf.first().cloned()
         } else if let Some(ref mp4a) = self.mp4a {
-            mp4a.sinf.clone()
+            mp4a.sinf.first().cloned()
         } else if let Some(ref opus) = self.opus {
-            opus.sinf.clone()
+            opus.sinf.first().cloned()
         } else if let Some(ref _tx3g) = self.tx3g {
             None
         } else {

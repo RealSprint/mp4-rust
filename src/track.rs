@@ -877,7 +877,7 @@ impl Mp4TrackWriter {
                 let mut avc1 = Avc1Box::new(avc_config);
                 if let Some(encryption) = &config.encryption {
                     let sinf = encryption.clone().to_sinf(FourCC::from(*b"avc1"));
-                    avc1.sinf = Some(sinf);
+                    avc1.sinf = vec![sinf];
                 }
                 trak.mdia.minf.stbl.stsd.avc1 = Some(avc1);
             }
@@ -891,7 +891,7 @@ impl Mp4TrackWriter {
                 let mut hev1 = Hev1Box::new(hevc_config);
                 if let Some(encryption) = &config.encryption {
                     let sinf = encryption.clone().to_sinf(FourCC::from(*b"hev1"));
-                    hev1.sinf = Some(sinf);
+                    hev1.sinf = vec![sinf];
                 }
                 trak.mdia.minf.stbl.stsd.hev1 = Some(hev1);
             }
@@ -915,7 +915,7 @@ impl Mp4TrackWriter {
 
                 if let Some(encryption) = &config.encryption {
                     let sinf = encryption.clone().to_sinf(FourCC::from(*b"mp4a"));
-                    mp4a.sinf = Some(sinf);
+                    mp4a.sinf = vec![sinf];
                 }
 
                 trak.mdia.minf.stbl.stsd.mp4a = Some(mp4a);
@@ -929,7 +929,7 @@ impl Mp4TrackWriter {
 
                 if let Some(encryption) = &config.encryption {
                     let sinf = encryption.clone().to_sinf(FourCC::from(*b"opus"));
-                    opus.sinf = Some(sinf);
+                    opus.sinf = vec![sinf];
                 }
 
                 trak.mdia.minf.stbl.stsd.opus = Some(opus);

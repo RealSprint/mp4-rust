@@ -21,7 +21,7 @@ pub struct Hev1Box {
     pub depth: u16,
     pub hvcc: HvcCBox,
 
-    pub sinf: Option<SinfBox>,
+    pub sinf: Vec<SinfBox>,
 }
 
 impl Default for Hev1Box {
@@ -35,7 +35,7 @@ impl Default for Hev1Box {
             frame_count: 1,
             depth: 0x0018,
             hvcc: HvcCBox::default(),
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -51,12 +51,12 @@ impl Hev1Box {
             frame_count: 1,
             depth: 0x0018,
             hvcc: HvcCBox::new(),
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.sinf.is_some()
+        !self.sinf.is_empty()
     }
 
     pub fn get_type(&self) -> BoxType {
@@ -69,9 +69,7 @@ impl Hev1Box {
     pub fn get_size(&self) -> u64 {
         let mut size = HEADER_SIZE + 8 + 70 + self.hvcc.box_size();
 
-        if let Some(ref sinf) = self.sinf {
-            size += sinf.box_size();
-        }
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
 
         size
     }
@@ -121,7 +119,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Hev1Box {
         reader.read_i16::<BigEndian>()?; // pre-defined
 
         let mut hvcc = None;
-        let mut sinf = None;
+        let mut sinf = Vec::new();
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -140,7 +138,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Hev1Box {
                     hvcc = Some(HvcCBox::read_box(reader, s)?);
                 }
                 BoxType::SinfBox => {
-                    sinf = Some(SinfBox::read_box(reader, s)?);
+                    sinf.push(SinfBox::read_box(reader, s)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -196,7 +194,7 @@ impl<W: Write> WriteBox<&mut W> for Hev1Box {
 
         self.hvcc.write_box(writer)?;
 
-        if let Some(ref sinf) = self.sinf {
+        for sinf in &self.sinf {
             sinf.write_box(writer)?;
         }
 
@@ -425,7 +423,7 @@ mod tests {
                 configuration_version: 1,
                 ..Default::default()
             },
-            sinf: None,
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -454,7 +452,7 @@ mod tests {
                 configuration_version: 1,
                 ..Default::default()
             },
-            sinf: Some(SinfBox::default()),
+            sinf: vec![SinfBox::default()],
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();

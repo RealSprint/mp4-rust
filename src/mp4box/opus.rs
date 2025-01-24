@@ -15,7 +15,7 @@ pub struct OpusBox {
     pub samplerate: FixedPointU16,
     pub dops: DopsBox,
 
-    pub sinf: Option<SinfBox>,
+    pub sinf: Vec<SinfBox>,
 }
 
 impl OpusBox {
@@ -31,12 +31,12 @@ impl OpusBox {
                 output_gain: config.output_gain,
                 channel_mapping_family: config.channel_mapping_family.clone(),
             },
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.sinf.is_some()
+        !self.sinf.is_empty()
     }
 
     pub fn get_type(&self) -> BoxType {
@@ -50,9 +50,7 @@ impl OpusBox {
         let mut size = HEADER_SIZE + 8 + 20;
         size += self.dops.box_size();
 
-        if let Some(ref sinf) = self.sinf {
-            size += sinf.box_size();
-        }
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
 
         size
     }
@@ -104,7 +102,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for OpusBox {
         }
 
         let mut dops = None;
-        let mut sinf = None;
+        let mut sinf = Vec::new();
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -122,7 +120,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for OpusBox {
                     dops = Some(DopsBox::read_box(reader, s)?);
                 }
                 BoxType::SinfBox => {
-                    sinf = Some(SinfBox::read_box(reader, s)?);
+                    sinf.push(SinfBox::read_box(reader, s)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -165,7 +163,7 @@ impl<W: Write> WriteBox<&mut W> for OpusBox {
 
         self.dops.write_box(writer)?;
 
-        if let Some(ref sinf) = self.sinf {
+        for sinf in &self.sinf {
             sinf.write_box(writer)?;
         }
 
@@ -369,7 +367,7 @@ mod tests {
                 output_gain: 3,
                 channel_mapping_family: ChannelMappingFamily::Family0 { stereo: true },
             },
-            sinf: None,
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -397,7 +395,7 @@ mod tests {
                 output_gain: 3,
                 channel_mapping_family: ChannelMappingFamily::Family0 { stereo: true },
             },
-            sinf: Some(SinfBox::default()),
+            sinf: vec![SinfBox::default()],
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();

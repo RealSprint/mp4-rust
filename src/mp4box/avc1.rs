@@ -23,7 +23,7 @@ pub struct Avc1Box {
     pub colr: Option<ColrBox>,
     pub pasp: Option<PaspBox>,
 
-    pub sinf: Option<SinfBox>,
+    pub sinf: Vec<SinfBox>,
 }
 
 impl Default for Avc1Box {
@@ -39,7 +39,7 @@ impl Default for Avc1Box {
             avcc: AvcCBox::default(),
             colr: None,
             pasp: None,
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -65,12 +65,12 @@ impl Avc1Box {
                     numerator: *numerator,
                     denumerator: *denumerator,
                 }),
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.sinf.is_some()
+        !self.sinf.is_empty()
     }
 
     pub fn get_type(&self) -> BoxType {
@@ -81,11 +81,7 @@ impl Avc1Box {
     }
 
     pub fn get_size(&self) -> u64 {
-        let mut size = HEADER_SIZE
-            + 8
-            + 70
-            + self.avcc.box_size()
-            + self.sinf.as_ref().map_or(0, |sinf| sinf.box_size());
+        let mut size = HEADER_SIZE + 8 + 70 + self.avcc.box_size();
 
         if let Some(colr) = &self.colr {
             size += colr.box_size();
@@ -94,6 +90,8 @@ impl Avc1Box {
         if let Some(pasp) = &self.pasp {
             size += pasp.box_size();
         }
+
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
 
         size
     }
@@ -145,7 +143,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
         let mut avcc = None;
         let mut colr = None;
         let mut pasp = None;
-        let mut sinf = None;
+        let mut sinf = Vec::new();
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -170,7 +168,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
                     pasp = Some(PaspBox::read_box(reader, s)?);
                 }
                 BoxType::SinfBox => {
-                    sinf = Some(SinfBox::read_box(reader, s)?);
+                    sinf.push(SinfBox::read_box(reader, s)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -235,7 +233,7 @@ impl<W: Write> WriteBox<&mut W> for Avc1Box {
             pasp.write_box(writer)?;
         }
 
-        if let Some(sinf) = &self.sinf {
+        for sinf in self.sinf.iter() {
             sinf.write_box(writer)?;
         }
 
@@ -418,7 +416,7 @@ mod tests {
             },
             colr: None,
             pasp: None,
-            sinf: None,
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -427,6 +425,49 @@ mod tests {
         let mut reader = Cursor::new(&buf);
         let header = BoxHeader::read(&mut reader).unwrap();
         assert_eq!(header.name, BoxType::Avc1Box);
+        assert_eq!(src_box.box_size(), header.size);
+
+        let dst_box = Avc1Box::read_box(&mut reader, header.size).unwrap();
+        assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_avc1_with_sinf() {
+        let src_box = Avc1Box {
+            data_reference_index: 1,
+            width: 320,
+            height: 240,
+            horizresolution: FixedPointU16::new(0x48),
+            vertresolution: FixedPointU16::new(0x48),
+            frame_count: 1,
+            depth: 24,
+            avcc: AvcCBox {
+                configuration_version: 1,
+                avc_profile_indication: 100,
+                profile_compatibility: 0,
+                avc_level_indication: 13,
+                length_size_minus_one: 3,
+                sequence_parameter_sets: vec![NalUnit {
+                    bytes: vec![
+                        0x67, 0x64, 0x00, 0x0D, 0xAC, 0xD9, 0x41, 0x41, 0xFA, 0x10, 0x00, 0x00,
+                        0x03, 0x00, 0x10, 0x00, 0x00, 0x03, 0x03, 0x20, 0xF1, 0x42, 0x99, 0x60,
+                    ],
+                }],
+                picture_parameter_sets: vec![NalUnit {
+                    bytes: vec![0x68, 0xEB, 0xE3, 0xCB, 0x22, 0xC0],
+                }],
+            },
+            colr: None,
+            pasp: None,
+            sinf: vec![SinfBox::default()],
+        };
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+        assert_eq!(buf.len(), src_box.box_size() as usize);
+
+        let mut reader = Cursor::new(&buf);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::EncvBox);
         assert_eq!(src_box.box_size(), header.size);
 
         let dst_box = Avc1Box::read_box(&mut reader, header.size).unwrap();

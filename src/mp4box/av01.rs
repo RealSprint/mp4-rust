@@ -22,7 +22,7 @@ pub struct Av01Box {
     pub av1c: Av1CBox,
     pub colr: Option<ColrBox>,
     pub pasp: Option<PaspBox>,
-    pub sinf: Option<SinfBox>,
+    pub sinf: Vec<SinfBox>,
 }
 
 impl Default for Av01Box {
@@ -38,7 +38,7 @@ impl Default for Av01Box {
             av1c: Av1CBox::default(),
             colr: None,
             pasp: None,
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -64,12 +64,12 @@ impl Av01Box {
                     numerator: *numerator,
                     denumerator: *denumerator,
                 }),
-            sinf: None,
+            sinf: Vec::new(),
         }
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.sinf.is_some()
+        !self.sinf.is_empty()
     }
 
     pub fn get_type(&self) -> BoxType {
@@ -90,9 +90,7 @@ impl Av01Box {
             size += pasp.box_size();
         }
 
-        if let Some(sinf) = &self.sinf {
-            size += sinf.box_size();
-        }
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
 
         size
     }
@@ -145,7 +143,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Av01Box {
         let mut av1c = None;
         let mut colr = None;
         let mut pasp = None;
-        let mut sinf = None;
+        let mut sinf = Vec::new();
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -169,7 +167,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Av01Box {
                     pasp = Some(PaspBox::read_box(reader, s)?);
                 }
                 BoxType::SinfBox => {
-                    sinf = Some(SinfBox::read_box(reader, s)?);
+                    sinf.push(SinfBox::read_box(reader, s)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -234,7 +232,7 @@ impl<W: Write> WriteBox<&mut W> for Av01Box {
             pasp.write_box(writer)?;
         }
 
-        if let Some(sinf) = &self.sinf {
+        for sinf in &self.sinf {
             sinf.write_box(writer)?;
         }
 
@@ -407,7 +405,7 @@ mod tests {
                 numerator: 16,
                 denumerator: 9,
             }),
-            sinf: None,
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -446,7 +444,7 @@ mod tests {
             },
             colr: None,
             pasp: None,
-            sinf: Some(SinfBox::default()),
+            sinf: vec![SinfBox::default()],
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
