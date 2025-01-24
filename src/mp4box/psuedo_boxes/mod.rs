@@ -1,1 +1,1 @@
-pub(crate) mod visual_sample_entry;
+pub(crate) mod sample_entry;

@@ -1,5 +1,5 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use psuedo_boxes::visual_sample_entry::get_box_type;
+use psuedo_boxes::sample_entry::{get_box_type, SampleEntryType};
 use serde::Serialize;
 use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
@@ -152,7 +152,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
                 tx3g = Some(Tx3gBox::read_box(reader, s)?);
             }
             BoxType::EncvBox => {
-                let box_type = get_box_type(reader, size)?;
+                let box_type = get_box_type(reader, size, SampleEntryType::Video)?;
                 match box_type {
                     BoxType::Avc1Box => {
                         avc1 = Some(Avc1Box::read_box(reader, s)?);
@@ -172,7 +172,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
                 }
             }
             BoxType::EncaBox => {
-                let box_type = get_box_type(reader, size)?;
+                let box_type = get_box_type(reader, size, SampleEntryType::Audio)?;
 
                 match box_type {
                     BoxType::Mp4aBox => {

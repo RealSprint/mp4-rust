@@ -862,6 +862,7 @@ impl Mp4TrackWriter {
         trak.mdia.mdhd.language = config.language.to_owned();
         trak.mdia.hdlr.handler_type = config.track_type.into();
         trak.mdia.minf.stbl.co64 = Some(Co64Box::default());
+
         match config.media_conf {
             MediaConfig::AvcConfig(ref avc_config) => {
                 trak.tkhd.set_width(avc_config.width);
@@ -884,7 +885,11 @@ impl Mp4TrackWriter {
                 let vmhd = VmhdBox::default();
                 trak.mdia.minf.vmhd = Some(vmhd);
 
-                let hev1 = Hev1Box::new(hevc_config);
+                let mut hev1 = Hev1Box::new(hevc_config);
+                if let Some(encryption) = &config.encryption {
+                    let sinf = encryption.clone().to_sinf(FourCC::from(*b"hev1"));
+                    hev1.sinf = Some(sinf);
+                }
                 trak.mdia.minf.stbl.stsd.hev1 = Some(hev1);
             }
             MediaConfig::Vp9Config(ref config) => {
@@ -903,7 +908,13 @@ impl Mp4TrackWriter {
                 let smhd = SmhdBox::default();
                 trak.mdia.minf.smhd = Some(smhd);
 
-                let mp4a = Mp4aBox::new(aac_config);
+                let mut mp4a = Mp4aBox::new(aac_config);
+
+                if let Some(encryption) = &config.encryption {
+                    let sinf = encryption.clone().to_sinf(FourCC::from(*b"mp4a"));
+                    mp4a.sinf = Some(sinf);
+                }
+
                 trak.mdia.minf.stbl.stsd.mp4a = Some(mp4a);
             }
             MediaConfig::TtxtConfig(ref _ttxt_config) => {
@@ -911,7 +922,13 @@ impl Mp4TrackWriter {
                 trak.mdia.minf.stbl.stsd.tx3g = Some(tx3g);
             }
             MediaConfig::OpusConfig(ref opus_config) => {
-                let opus = OpusBox::new(opus_config);
+                let mut opus = OpusBox::new(opus_config);
+
+                if let Some(encryption) = &config.encryption {
+                    let sinf = encryption.clone().to_sinf(FourCC::from(*b"opus"));
+                    opus.sinf = Some(sinf);
+                }
+
                 trak.mdia.minf.stbl.stsd.opus = Some(opus);
             }
         }
