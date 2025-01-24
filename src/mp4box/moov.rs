@@ -23,8 +23,7 @@ pub struct MoovBox {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub udta: Option<UdtaBox>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pssh: Option<PsshBox>,
+    pub pssh: Vec<PsshBox>,
 }
 
 impl MoovBox {
@@ -46,9 +45,8 @@ impl MoovBox {
         if let Some(udta) = &self.udta {
             size += udta.box_size();
         }
-        if let Some(pssh) = &self.pssh {
-            size += pssh.box_size();
-        }
+
+        size += self.pssh.iter().map(|pssh| pssh.box_size()).sum::<u64>();
 
         size
     }
@@ -81,7 +79,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoovBox {
         let mut meta = None;
         let mut udta = None;
         let mut mvex = None;
-        let mut pssh = None;
+        let mut pssh = Vec::new();
         let mut traks = Vec::new();
 
         let mut current = reader.stream_position()?;
@@ -114,7 +112,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoovBox {
                     udta = Some(UdtaBox::read_box(reader, s)?);
                 }
                 BoxType::PsshBox => {
-                    pssh = Some(PsshBox::read_box(reader, s)?);
+                    pssh.push(PsshBox::read_box(reader, s)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -160,9 +158,10 @@ impl<W: Write> WriteBox<&mut W> for MoovBox {
         if let Some(udta) = &self.udta {
             udta.write_box(writer)?;
         }
-        if let Some(pssh) = &self.pssh {
+        for pssh in self.pssh.iter() {
             pssh.write_box(writer)?;
         }
+
         Ok(0)
     }
 }
@@ -181,7 +180,7 @@ mod tests {
             traks: vec![],
             meta: Some(MetaBox::default()),
             udta: Some(UdtaBox::default()),
-            pssh: Some(PsshBox::default()),
+            pssh: vec![PsshBox::default()],
         };
 
         let mut buf = Vec::new();
