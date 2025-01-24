@@ -38,6 +38,7 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
             minor_version: mp4_reader.minor_version(),
             compatible_brands: mp4_reader.compatible_brands().to_vec(),
             timescale: mp4_reader.timescale(),
+            pssh: mp4_reader.moov.pssh.clone(),
         },
     )?;
 
@@ -79,7 +80,7 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
             timescale: track.timescale(),
             language: track.language().to_string(),
             media_conf,
-            encryption: track.get_encryption()?,
+            sinf: track.get_sinf(),
         };
 
         mp4_writer.add_track(&track_conf)?;

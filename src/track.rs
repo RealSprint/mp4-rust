@@ -1,6 +1,6 @@
 use bytes::BytesMut;
-use encryption::encryption_config::{EncryptionConfig, EncryptionSchemeType};
 use encryption::sample_encryption::SampleEncryption;
+use sinf::SinfBox;
 use std::cmp;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
@@ -27,7 +27,7 @@ pub struct TrackConfig {
     pub timescale: u32,
     pub language: String,
     pub media_conf: MediaConfig,
-    pub encryption: Option<EncryptionConfig>,
+    pub sinf: Vec<SinfBox>,
 }
 
 impl From<MediaConfig> for TrackConfig {
@@ -51,7 +51,7 @@ impl From<AvcConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AvcConfig(avc_conf),
-            encryption: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -63,7 +63,7 @@ impl From<HevcConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::HevcConfig(hevc_conf),
-            encryption: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -75,7 +75,7 @@ impl From<Av1Config> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::Av1Config(av1_conf),
-            encryption: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -87,7 +87,7 @@ impl From<AacConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AacConfig(aac_conf),
-            encryption: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -99,7 +99,7 @@ impl From<OpusConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::OpusConfig(opus_conf),
-            encryption: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -111,7 +111,7 @@ impl From<TtxtConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::TtxtConfig(txtt_conf),
-            encryption: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -123,7 +123,7 @@ impl From<Vp9Config> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::Vp9Config(vp9_conf),
-            encryption: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -155,30 +155,8 @@ impl Mp4Track {
         self.encryption_data.extend(data);
     }
 
-    pub fn get_encryption(&self) -> Result<Option<EncryptionConfig>> {
-        let sinf = self.trak.mdia.minf.stbl.stsd.get_sinf();
-
-        let Some(sinf) = sinf else {
-            return Ok(None);
-        };
-
-        let Some(schm) = sinf.schm else {
-            return Ok(None);
-        };
-
-        let Some(schi) = sinf.schi else {
-            return Ok(None);
-        };
-
-        let Ok(scheme_type) = EncryptionSchemeType::try_from(schm.scheme_type) else {
-            return Err(Error::InvalidData("unsupported encryption scheme type"));
-        };
-
-        let Some(iv) = schi.tenc.get_initialization_vector() else {
-            return Err(Error::InvalidData("init vector not found"));
-        };
-
-        Ok(Some(EncryptionConfig::new(scheme_type, iv)))
+    pub fn get_sinf(&self) -> Vec<SinfBox> {
+        self.trak.mdia.minf.stbl.stsd.get_sinf()
     }
 
     pub fn track_id(&self) -> u32 {
@@ -875,10 +853,7 @@ impl Mp4TrackWriter {
                 trak.mdia.minf.vmhd = Some(vmhd);
 
                 let mut avc1 = Avc1Box::new(avc_config);
-                if let Some(encryption) = &config.encryption {
-                    let sinf = encryption.clone().to_sinf(FourCC::from(*b"avc1"));
-                    avc1.sinf = vec![sinf];
-                }
+                avc1.sinf = config.sinf.clone();
                 trak.mdia.minf.stbl.stsd.avc1 = Some(avc1);
             }
             MediaConfig::HevcConfig(ref hevc_config) => {
@@ -889,10 +864,7 @@ impl Mp4TrackWriter {
                 trak.mdia.minf.vmhd = Some(vmhd);
 
                 let mut hev1 = Hev1Box::new(hevc_config);
-                if let Some(encryption) = &config.encryption {
-                    let sinf = encryption.clone().to_sinf(FourCC::from(*b"hev1"));
-                    hev1.sinf = vec![sinf];
-                }
+                hev1.sinf = config.sinf.clone();
                 trak.mdia.minf.stbl.stsd.hev1 = Some(hev1);
             }
             MediaConfig::Vp9Config(ref config) => {
@@ -912,12 +884,7 @@ impl Mp4TrackWriter {
                 trak.mdia.minf.smhd = Some(smhd);
 
                 let mut mp4a = Mp4aBox::new(aac_config);
-
-                if let Some(encryption) = &config.encryption {
-                    let sinf = encryption.clone().to_sinf(FourCC::from(*b"mp4a"));
-                    mp4a.sinf = vec![sinf];
-                }
-
+                mp4a.sinf = config.sinf.clone();
                 trak.mdia.minf.stbl.stsd.mp4a = Some(mp4a);
             }
             MediaConfig::TtxtConfig(ref _ttxt_config) => {
@@ -927,10 +894,7 @@ impl Mp4TrackWriter {
             MediaConfig::OpusConfig(ref opus_config) => {
                 let mut opus = OpusBox::new(opus_config);
 
-                if let Some(encryption) = &config.encryption {
-                    let sinf = encryption.clone().to_sinf(FourCC::from(*b"opus"));
-                    opus.sinf = vec![sinf];
-                }
+                opus.sinf = config.sinf.clone();
 
                 trak.mdia.minf.stbl.stsd.opus = Some(opus);
             }
