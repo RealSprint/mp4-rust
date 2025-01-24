@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::io::{Read, Seek};
 use std::time::Duration;
 
-use encryption::encryption_config::EncryptionConfig;
 use prft::PrftBox;
 use tracing::debug;
 
@@ -282,13 +281,6 @@ impl<R: Read + Seek> Mp4Reader<R> {
 
     pub fn tracks(&self) -> &HashMap<u32, Mp4Track> {
         &self.tracks
-    }
-
-    pub fn encryption(&self) -> Option<EncryptionConfig> {
-        self.moov
-            .pssh
-            .as_ref()
-            .and_then(EncryptionConfig::from_pssh)
     }
 
     pub fn sample_count(&self, track_id: u32) -> Result<u32> {

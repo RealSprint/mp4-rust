@@ -1,5 +1,4 @@
 use byteorder::{BigEndian, WriteBytesExt};
-use encryption::encryption_config::EncryptionConfig;
 use std::io::{Seek, SeekFrom, Write};
 
 use crate::mp4box::*;
@@ -12,7 +11,6 @@ pub struct Mp4Config {
     pub minor_version: u32,
     pub compatible_brands: Vec<FourCC>,
     pub timescale: u32,
-    pub encryption: Option<EncryptionConfig>,
 }
 
 #[derive(Debug)]
@@ -22,7 +20,6 @@ pub struct Mp4Writer<W> {
     mdat_pos: u64,
     timescale: u32,
     duration: u64,
-    encryption: Option<EncryptionConfig>,
 }
 
 impl<W> Mp4Writer<W> {
@@ -85,7 +82,6 @@ impl<W: Write + Seek> Mp4Writer<W> {
             mdat_pos,
             timescale,
             duration,
-            encryption: config.encryption.clone(),
         })
     }
 
@@ -147,8 +143,6 @@ impl<W: Write + Seek> Mp4Writer<W> {
         if moov.mvhd.duration > (u32::MAX as u64) {
             moov.mvhd.version = 1
         }
-
-        moov.pssh = self.encryption.as_ref().map(|enc| enc.to_pssh());
 
         moov.write_box(&mut self.writer)?;
         Ok(())

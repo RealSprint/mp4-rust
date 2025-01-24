@@ -88,7 +88,7 @@ impl TencBox {
     }
 
     // TODO: Include the type Kid/constant
-    pub fn get_init_vector(&self) -> Option<InitializationVector> {
+    pub fn get_initialization_vector(&self) -> Option<InitializationVector> {
         if !self.default_is_protected {
             return None;
         }

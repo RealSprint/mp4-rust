@@ -1,9 +1,9 @@
 use bytes::BytesMut;
-use encryption::encryption_config::EncryptionConfig;
+use encryption::encryption_config::{EncryptionConfig, EncryptionSchemeType};
 use encryption::sample_encryption::SampleEncryption;
 use std::cmp;
 use std::collections::VecDeque;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::Duration;
 
@@ -170,12 +170,15 @@ impl Mp4Track {
             return Ok(None);
         };
 
-        // TODO: Fix error handling
-        let scheme_type = schm.scheme_type.try_into().unwrap();
-        let iv = schi.tenc.get_init_vector().unwrap();
+        let Ok(scheme_type) = EncryptionSchemeType::try_from(schm.scheme_type) else {
+            return Err(Error::InvalidData("unsupported encryption scheme type"));
+        };
 
-        // TODO: system id?
-        Ok(Some(EncryptionConfig::new(scheme_type, iv, [0; 16])))
+        let Some(iv) = schi.tenc.get_initialization_vector() else {
+            return Err(Error::InvalidData("init vector not found"));
+        };
+
+        Ok(Some(EncryptionConfig::new(scheme_type, iv)))
     }
 
     pub fn track_id(&self) -> u32 {
