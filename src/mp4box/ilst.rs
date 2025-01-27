@@ -166,7 +166,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for IlstItemBox {
     }
 }
 
-impl<'a> Metadata<'a> for IlstBox {
+impl Metadata<'_> for IlstBox {
     fn title(&self) -> Option<Cow<str>> {
         self.items.get(&MetadataKey::Title).map(item_to_str)
     }
