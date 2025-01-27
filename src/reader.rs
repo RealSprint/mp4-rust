@@ -317,30 +317,4 @@ impl<R> Mp4Reader<R> {
             })
         })
     }
-
-    // pub get_encryption(&self) -> Vec<EncryptionConfig> {
-    //         let sinf = self.trak.mdia.minf.stbl.stsd.get_sinf();
-
-    //         let Some(sinf) = sinf else {
-    //             return Ok(None);
-    //         };
-
-    //         let Some(schm) = sinf.schm else {
-    //             return Ok(None);
-    //         };
-
-    //         let Some(schi) = sinf.schi else {
-    //             return Ok(None);
-    //         };
-
-    //         let Ok(scheme_type) = EncryptionSchemeType::try_from(schm.scheme_type) else {
-    //             return Err(Error::InvalidData("unsupported encryption scheme type"));
-    //         };
-
-    //         let Some(iv) = schi.tenc.get_initialization_vector() else {
-    //             return Err(Error::InvalidData("init vector not found"));
-    //         };
-
-    //         Ok(Some(EncryptionConfig::new(scheme_type, iv)))
-    // }
 }
