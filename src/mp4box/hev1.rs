@@ -129,7 +129,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Hev1Box {
 
             if s > size {
                 return Err(Error::InvalidData(
-                    "avc1 box contains a box with a larger size than it",
+                    "hev1 box contains a box with a larger size than it",
                 ));
             }
 
