@@ -326,6 +326,7 @@ impl<R> Mp4Reader<R> {
 }
 
 fn find_iv_size(tracks: &HashMap<u32, Mp4Track>) -> HashMap<u32, u8> {
+    // Note: This value could also be read from saiz if not present in tenc.
     tracks
         .iter()
         .filter_map(|(track_id, track)| {
