@@ -78,15 +78,15 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
                     "traf box contains a box with a larger size than it",
                 ));
             }
-            boxes.insert(name, s);
+            boxes.insert(name, current);
             skip_box(reader, s)?;
             current = reader.stream_position()?;
         }
 
         if let Some(tfhd_start) = boxes.remove(&BoxType::TfhdBox) {
+            reader.seek(SeekFrom::Start(tfhd_start))?;
             let header = BoxHeader::read(reader)?;
             let BoxHeader { name: _, size: s } = header;
-            reader.seek(SeekFrom::Start(tfhd_start))?;
             tfhd = Some(TfhdBox::read_box(reader, s, context)?);
         }
 
@@ -95,25 +95,25 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
         }
 
         if let Some(tfdt_start) = boxes.remove(&BoxType::TfdtBox) {
+            reader.seek(SeekFrom::Start(tfdt_start))?;
             let header = BoxHeader::read(reader)?;
             let BoxHeader { name: _, size: s } = header;
-            reader.seek(SeekFrom::Start(tfdt_start))?;
             tfdt = Some(TfdtBox::read_box(reader, s, context)?);
         }
 
         if let Some(trun_start) = boxes.remove(&BoxType::TrunBox) {
+            reader.seek(SeekFrom::Start(trun_start))?;
             let header = BoxHeader::read(reader)?;
             let BoxHeader { name: _, size: s } = header;
-            reader.seek(SeekFrom::Start(trun_start))?;
             trun = Some(TrunBox::read_box(reader, s, context)?);
         }
 
         if let Some(senc_start) = boxes.remove(&BoxType::SencBox) {
             let track_id = tfhd.as_ref().expect("checked above").track_id;
 
+            reader.seek(SeekFrom::Start(senc_start))?;
             let header = BoxHeader::read(reader)?;
             let BoxHeader { name: _, size: s } = header;
-            reader.seek(SeekFrom::Start(senc_start))?;
             senc = Some(SencBox::read_box(reader, s, context, track_id)?);
         }
 
