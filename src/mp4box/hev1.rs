@@ -142,7 +142,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Hev1Box {
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
-                    skip_bytes(reader, s)?;
+                    skip_box(reader, s)?;
                 }
             }
 
