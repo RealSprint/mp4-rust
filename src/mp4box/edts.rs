@@ -47,7 +47,7 @@ impl Mp4Box for EdtsBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for EdtsBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut edts = EdtsBox::new();
@@ -61,7 +61,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for EdtsBox {
         }
 
         if let BoxType::ElstBox = name {
-            let elst = ElstBox::read_box(reader, s)?;
+            let elst = ElstBox::read_box(reader, s, context)?;
             edts.elst = Some(elst);
         }
 

@@ -75,7 +75,7 @@ impl Mp4Box for Tx3gBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for Tx3gBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         reader.read_u32::<BigEndian>()?; // reserved
@@ -183,7 +183,7 @@ mod tests {
         assert_eq!(header.name, BoxType::Tx3gBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Tx3gBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Tx3gBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

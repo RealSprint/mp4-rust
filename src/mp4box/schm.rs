@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use super::{
     box_start, read_box_header_ext, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType,
-    FourCC, Mp4Box, ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
+    FourCC, Mp4Box, Mp4Context, ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
 const SCHM_BOX_SIZE: u64 = HEADER_SIZE + HEADER_EXT_SIZE + 4 + 4;
@@ -62,7 +62,7 @@ impl Mp4Box for SchmBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for SchmBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;
@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(header.name, BoxType::SchmBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SchmBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = SchmBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(header.name, BoxType::SchmBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SchmBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = SchmBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

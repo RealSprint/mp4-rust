@@ -1,6 +1,8 @@
 use std::io::{Read, Seek};
 
-use crate::{box_start, sinf::SinfBox, BoxHeader, BoxType, Error, ReadBox, Result, HEADER_SIZE};
+use crate::{
+    box_start, sinf::SinfBox, BoxHeader, BoxType, Error, Mp4Context, ReadBox, Result, HEADER_SIZE,
+};
 
 // Video Sample Entry
 // reserved u8[6]             =  6 bytes (from Sample Entry)
@@ -57,6 +59,7 @@ pub fn get_box_type<R: Read + Seek>(
     reader: &mut R,
     size: u64,
     kind: SampleEntryType,
+    context: &mut Mp4Context,
 ) -> Result<BoxType> {
     let pos = reader.stream_position()?;
     let start = box_start(reader)?;
@@ -84,7 +87,7 @@ pub fn get_box_type<R: Read + Seek>(
         }
     };
 
-    let sinf = SinfBox::read_box(reader, sinf_header.size)?;
+    let sinf = SinfBox::read_box(reader, sinf_header.size, context)?;
 
     let data_format: u32 = sinf.frma.data_format.into();
 
@@ -152,7 +155,13 @@ mod tests {
         assert_eq!(header.name, BoxType::EncvBox);
 
         let original_position = reader.stream_position().unwrap();
-        let box_type = get_box_type(&mut reader, header.size, SampleEntryType::Video).unwrap();
+        let box_type = get_box_type(
+            &mut reader,
+            header.size,
+            SampleEntryType::Video,
+            &mut Mp4Context::default(),
+        )
+        .unwrap();
         assert_eq!(box_type, BoxType::Avc1Box);
         assert_eq!(reader.stream_position().unwrap(), original_position);
     }
@@ -196,7 +205,13 @@ mod tests {
         assert_eq!(header.name, BoxType::EncaBox);
 
         let original_position = reader.stream_position().unwrap();
-        let box_type = get_box_type(&mut reader, header.size, SampleEntryType::Audio).unwrap();
+        let box_type = get_box_type(
+            &mut reader,
+            header.size,
+            SampleEntryType::Audio,
+            &mut Mp4Context::default(),
+        )
+        .unwrap();
         assert_eq!(box_type, BoxType::Mp4aBox);
         assert_eq!(reader.stream_position().unwrap(), original_position);
     }

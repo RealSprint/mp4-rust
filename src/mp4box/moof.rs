@@ -48,7 +48,7 @@ impl Mp4Box for MoofBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for MoofBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut mfhd = None;
@@ -68,10 +68,10 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoofBox {
 
             match name {
                 BoxType::MfhdBox => {
-                    mfhd = Some(MfhdBox::read_box(reader, s)?);
+                    mfhd = Some(MfhdBox::read_box(reader, s, context)?);
                 }
                 BoxType::TrafBox => {
-                    let traf = TrafBox::read_box(reader, s)?;
+                    let traf = TrafBox::read_box(reader, s, context)?;
                     trafs.push(traf);
                 }
 

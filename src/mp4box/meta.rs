@@ -88,7 +88,7 @@ impl Default for MetaBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for MetaBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let extended_header = reader.read_u32::<BigEndian>()?;
@@ -120,7 +120,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MetaBox {
 
             match name {
                 BoxType::HdlrBox => {
-                    hdlr = Some(HdlrBox::read_box(reader, s)?);
+                    hdlr = Some(HdlrBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -150,7 +150,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MetaBox {
 
                     match name {
                         BoxType::IlstBox => {
-                            ilst = Some(IlstBox::read_box(reader, s)?);
+                            ilst = Some(IlstBox::read_box(reader, s, context)?);
                         }
                         _ => {
                             debug!("Skipping box: {:?}", name);
@@ -244,7 +244,7 @@ mod tests {
         assert_eq!(header.name, BoxType::MetaBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MetaBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = MetaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(header.name, BoxType::MetaBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MetaBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = MetaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 
@@ -274,7 +274,7 @@ mod tests {
         let header = BoxHeader::read(&mut reader).unwrap();
         assert_eq!(header.name, BoxType::MetaBox);
 
-        let meta_box = MetaBox::read_box(&mut reader, header.size).unwrap();
+        let meta_box = MetaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
 
         // this contains \xa9too box in the ilst
         // it designates the tool that created the file, but is not yet supported by this crate
@@ -307,7 +307,7 @@ mod tests {
         assert_eq!(header.name, BoxType::MetaBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MetaBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = MetaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 }

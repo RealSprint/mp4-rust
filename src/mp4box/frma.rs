@@ -4,8 +4,8 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
 use super::{
-    box_start, skip_bytes_to, BoxHeader, BoxType, FourCC, Mp4Box, ReadBox, Result, WriteBox,
-    HEADER_SIZE,
+    box_start, skip_bytes_to, BoxHeader, BoxType, FourCC, Mp4Box, Mp4Context, ReadBox, Result,
+    WriteBox, HEADER_SIZE,
 };
 
 // ISO 14496-12:2022 - 8.12.3 Original Format Box
@@ -43,7 +43,7 @@ impl Mp4Box for FrmaBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for FrmaBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let data_format = reader.read_u32::<BigEndian>()?.into();
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(header.name, BoxType::FrmaBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = FrmaBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = FrmaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

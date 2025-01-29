@@ -39,7 +39,7 @@ impl Mp4Box for DinfBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for DinfBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut dref = None;
@@ -58,7 +58,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for DinfBox {
 
             match name {
                 BoxType::DrefBox => {
-                    dref = Some(DrefBox::read_box(reader, s)?);
+                    dref = Some(DrefBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -143,7 +143,7 @@ impl Mp4Box for DrefBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for DrefBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut current = reader.stream_position()?;
@@ -170,7 +170,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for DrefBox {
 
             match name {
                 BoxType::UrlBox => {
-                    url = Some(UrlBox::read_box(reader, s)?);
+                    url = Some(UrlBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     skip_box(reader, s)?;
@@ -260,7 +260,7 @@ impl Mp4Box for UrlBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for UrlBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;

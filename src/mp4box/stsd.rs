@@ -104,7 +104,7 @@ impl Mp4Box for StsdBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;
@@ -130,40 +130,40 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
 
         match name {
             BoxType::Avc1Box => {
-                avc1 = Some(Avc1Box::read_box(reader, s)?);
+                avc1 = Some(Avc1Box::read_box(reader, s, context)?);
             }
             BoxType::Hev1Box => {
-                hev1 = Some(Hev1Box::read_box(reader, s)?);
+                hev1 = Some(Hev1Box::read_box(reader, s, context)?);
             }
             BoxType::Vp09Box => {
-                vp09 = Some(Vp09Box::read_box(reader, s)?);
+                vp09 = Some(Vp09Box::read_box(reader, s, context)?);
             }
             BoxType::Av01Box => {
-                av01 = Some(Av01Box::read_box(reader, s)?);
+                av01 = Some(Av01Box::read_box(reader, s, context)?);
             }
             BoxType::Mp4aBox => {
-                mp4a = Some(Mp4aBox::read_box(reader, s)?);
+                mp4a = Some(Mp4aBox::read_box(reader, s, context)?);
             }
             BoxType::OpusBox => {
-                opus = Some(OpusBox::read_box(reader, s)?);
+                opus = Some(OpusBox::read_box(reader, s, context)?);
             }
             BoxType::Tx3gBox => {
-                tx3g = Some(Tx3gBox::read_box(reader, s)?);
+                tx3g = Some(Tx3gBox::read_box(reader, s, context)?);
             }
             BoxType::EncvBox => {
-                let box_type = get_box_type(reader, size, SampleEntryType::Video)?;
+                let box_type = get_box_type(reader, size, SampleEntryType::Video, context)?;
                 match box_type {
                     BoxType::Avc1Box => {
-                        avc1 = Some(Avc1Box::read_box(reader, s)?);
+                        avc1 = Some(Avc1Box::read_box(reader, s, context)?);
                     }
                     BoxType::Hev1Box => {
-                        hev1 = Some(Hev1Box::read_box(reader, s)?);
+                        hev1 = Some(Hev1Box::read_box(reader, s, context)?);
                     }
                     BoxType::Vp09Box => {
-                        vp09 = Some(Vp09Box::read_box(reader, s)?);
+                        vp09 = Some(Vp09Box::read_box(reader, s, context)?);
                     }
                     BoxType::Av01Box => {
-                        av01 = Some(Av01Box::read_box(reader, s)?);
+                        av01 = Some(Av01Box::read_box(reader, s, context)?);
                     }
                     _ => {
                         warn!("Unknown box type found in encv: {:?}", box_type);
@@ -171,14 +171,14 @@ impl<R: Read + Seek> ReadBox<&mut R> for StsdBox {
                 }
             }
             BoxType::EncaBox => {
-                let box_type = get_box_type(reader, size, SampleEntryType::Audio)?;
+                let box_type = get_box_type(reader, size, SampleEntryType::Audio, context)?;
 
                 match box_type {
                     BoxType::Mp4aBox => {
-                        mp4a = Some(Mp4aBox::read_box(reader, s)?);
+                        mp4a = Some(Mp4aBox::read_box(reader, s, context)?);
                     }
                     BoxType::OpusBox => {
-                        opus = Some(OpusBox::read_box(reader, s)?);
+                        opus = Some(OpusBox::read_box(reader, s, context)?);
                     }
 
                     _ => {

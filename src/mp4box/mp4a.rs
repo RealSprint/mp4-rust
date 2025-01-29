@@ -92,7 +92,7 @@ impl Mp4Box for Mp4aBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         reader.read_u32::<BigEndian>()?; // reserved
@@ -128,10 +128,10 @@ impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
 
             match name {
                 BoxType::EsdsBox => {
-                    esds = Some(EsdsBox::read_box(reader, s)?);
+                    esds = Some(EsdsBox::read_box(reader, s, context)?);
                 }
                 BoxType::SinfBox => {
-                    sinf.push(SinfBox::read_box(reader, s)?);
+                    sinf.push(SinfBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -221,7 +221,7 @@ impl Mp4Box for EsdsBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for EsdsBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;
@@ -679,7 +679,7 @@ mod tests {
         assert_eq!(header.name, BoxType::Mp4aBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Mp4aBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Mp4aBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -702,7 +702,7 @@ mod tests {
         assert_eq!(header.name, BoxType::Mp4aBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Mp4aBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Mp4aBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -725,7 +725,7 @@ mod tests {
         assert_eq!(header.name, BoxType::EncaBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Mp4aBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Mp4aBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

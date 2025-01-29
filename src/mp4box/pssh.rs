@@ -4,8 +4,8 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
 use super::{
-    box_start, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, ReadBox,
-    Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
+    box_start, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, Mp4Context,
+    ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
 // ISO 23001-7:2023 - 8.1 Protection System Specific Header Box
@@ -102,7 +102,7 @@ impl Mp4Box for PsshBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for PsshBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, flags) = super::read_box_header_ext(reader)?;
@@ -207,7 +207,7 @@ mod tests {
         assert_eq!(header.name, BoxType::PsshBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = PsshBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -245,7 +245,7 @@ mod tests {
         assert_eq!(header.name, BoxType::PsshBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = PsshBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

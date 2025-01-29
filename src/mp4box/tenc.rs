@@ -5,8 +5,8 @@ use serde::Serialize;
 
 use super::{
     box_start, encryption::initialization_vector::InitializationVector, read_box_header_ext,
-    skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, ReadBox, Result,
-    WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
+    skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, Mp4Context, ReadBox,
+    Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
 // ISO 23001-7:2023 - 8.2 Track Encryption Box
@@ -19,7 +19,7 @@ pub struct TencBox {
     // 0: no encryption or constant IVs
     // 8: 64-bit IVs
     // 16: 128-bit IVs
-    default_per_sample_iv_size: u8,
+    pub(crate) default_per_sample_iv_size: u8,
     default_kid: [u8; 16],
 
     // 8: 64-bit IVs
@@ -125,7 +125,7 @@ impl Mp4Box for TencBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for TencBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, _flags) = read_box_header_ext(reader)?;
@@ -264,7 +264,8 @@ mod tests {
         assert_eq!(header.name, BoxType::TencBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = TencBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            TencBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -293,7 +294,8 @@ mod tests {
         assert_eq!(header.name, BoxType::TencBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = TencBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            TencBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -323,7 +325,8 @@ mod tests {
         assert_eq!(header.name, BoxType::TencBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = TencBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            TencBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -354,7 +357,8 @@ mod tests {
         assert_eq!(header.name, BoxType::TencBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = TencBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            TencBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -387,7 +391,8 @@ mod tests {
         assert_eq!(header.name, BoxType::TencBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = TencBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            TencBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

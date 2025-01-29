@@ -98,7 +98,7 @@ impl Mp4Box for Hev1Box {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for Hev1Box {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         reader.read_u32::<BigEndian>()?; // reserved
@@ -135,10 +135,10 @@ impl<R: Read + Seek> ReadBox<&mut R> for Hev1Box {
 
             match name {
                 BoxType::HvcCBox => {
-                    hvcc = Some(HvcCBox::read_box(reader, s)?);
+                    hvcc = Some(HvcCBox::read_box(reader, s, context)?);
                 }
                 BoxType::SinfBox => {
-                    sinf.push(SinfBox::read_box(reader, s)?);
+                    sinf.push(SinfBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -289,7 +289,7 @@ pub struct HvcCArray {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for HvcCBox {
-    fn read_box(reader: &mut R, _size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, _size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let configuration_version = reader.read_u8()?;
         let params = reader.read_u8()?;
         let general_profile_space = params & 0b11000000 >> 6;
@@ -434,7 +434,8 @@ mod tests {
         assert_eq!(header.name, BoxType::Hev1Box);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Hev1Box::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            Hev1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -463,7 +464,8 @@ mod tests {
         assert_eq!(header.name, BoxType::EncvBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Hev1Box::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            Hev1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

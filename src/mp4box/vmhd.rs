@@ -52,7 +52,7 @@ impl Mp4Box for VmhdBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for VmhdBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;
@@ -118,7 +118,8 @@ mod tests {
         assert_eq!(header.name, BoxType::VmhdBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = VmhdBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            VmhdBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

@@ -42,7 +42,7 @@ impl Mp4Box for MdiaBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for MdiaBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut mdhd = None;
@@ -63,13 +63,13 @@ impl<R: Read + Seek> ReadBox<&mut R> for MdiaBox {
 
             match name {
                 BoxType::MdhdBox => {
-                    mdhd = Some(MdhdBox::read_box(reader, s)?);
+                    mdhd = Some(MdhdBox::read_box(reader, s, context)?);
                 }
                 BoxType::HdlrBox => {
-                    hdlr = Some(HdlrBox::read_box(reader, s)?);
+                    hdlr = Some(HdlrBox::read_box(reader, s, context)?);
                 }
                 BoxType::MinfBox => {
-                    minf = Some(MinfBox::read_box(reader, s)?);
+                    minf = Some(MinfBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);

@@ -72,7 +72,7 @@ impl Mp4Box for MoovBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for MoovBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut mvhd = None;
@@ -96,23 +96,23 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoovBox {
 
             match name {
                 BoxType::MvhdBox => {
-                    mvhd = Some(MvhdBox::read_box(reader, s)?);
+                    mvhd = Some(MvhdBox::read_box(reader, s, context)?);
                 }
                 BoxType::MetaBox => {
-                    meta = Some(MetaBox::read_box(reader, s)?);
+                    meta = Some(MetaBox::read_box(reader, s, context)?);
                 }
                 BoxType::MvexBox => {
-                    mvex = Some(MvexBox::read_box(reader, s)?);
+                    mvex = Some(MvexBox::read_box(reader, s, context)?);
                 }
                 BoxType::TrakBox => {
-                    let trak = TrakBox::read_box(reader, s)?;
+                    let trak = TrakBox::read_box(reader, s, context)?;
                     traks.push(trak);
                 }
                 BoxType::UdtaBox => {
-                    udta = Some(UdtaBox::read_box(reader, s)?);
+                    udta = Some(UdtaBox::read_box(reader, s, context)?);
                 }
                 BoxType::PsshBox => {
-                    pssh.push(PsshBox::read_box(reader, s)?);
+                    pssh.push(PsshBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -192,7 +192,7 @@ mod tests {
         assert_eq!(header.name, BoxType::MoovBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MoovBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = MoovBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 
@@ -209,7 +209,7 @@ mod tests {
         assert_eq!(header.name, BoxType::MoovBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MoovBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = MoovBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 }

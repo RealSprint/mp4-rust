@@ -3,8 +3,8 @@ use std::io::{Read, Seek, Write};
 use serde::Serialize;
 
 use super::{
-    box_start, skip_bytes_to, tenc::TencBox, BoxHeader, BoxType, Error, Mp4Box, ReadBox, Result,
-    WriteBox,
+    box_start, skip_bytes_to, tenc::TencBox, BoxHeader, BoxType, Error, Mp4Box, Mp4Context,
+    ReadBox, Result, WriteBox,
 };
 
 // ISO 14496-12:2022 - 8.12.7 Scheme Information Box
@@ -42,7 +42,7 @@ impl Mp4Box for SchiBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for SchiBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let header = BoxHeader::read(reader)?;
@@ -55,7 +55,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for SchiBox {
 
         match name {
             BoxType::TencBox => {
-                let tenc = TencBox::read_box(reader, s)?;
+                let tenc = TencBox::read_box(reader, s, context)?;
 
                 skip_bytes_to(reader, start + size)?;
 
@@ -107,7 +107,7 @@ mod tests {
         assert_eq!(header.name, BoxType::SchiBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SchiBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = SchiBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

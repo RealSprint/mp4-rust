@@ -10,7 +10,7 @@ use super::{
         sample_encryption::{SampleEncryption, SubSampleEncryption},
     },
     read_box_header_ext, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box,
-    ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
+    Mp4Context, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
 // ISO 23001-7:2023 - 7.2.1 Sample Encryption Box
@@ -78,8 +78,13 @@ impl Mp4Box for SencBox {
     }
 }
 
-impl<R: Read + Seek> ReadBox<&mut R> for SencBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+impl SencBox {
+    pub fn read_box<R: Read + Seek>(
+        reader: &mut R,
+        size: u64,
+        context: &mut Mp4Context,
+        track_id: u32,
+    ) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;
@@ -92,7 +97,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for SencBox {
         }
 
         let senc = match version {
-            0 => read_version0(reader, size, use_subsamples),
+            0 => read_version0(reader, size, use_subsamples, context, track_id),
             1 => read_version1(reader, size),
             2 => read_version2(reader, size),
             _ => Err(Error::InvalidData("Invalid version")),
@@ -108,14 +113,19 @@ fn read_version0<R: Read + Seek>(
     reader: &mut R,
     _size: u64,
     use_sub_samples: bool,
+    context: &Mp4Context,
+    track_id: u32,
 ) -> Result<SencBox> {
     let sample_count = reader.read_u32::<BigEndian>()?;
 
+    let Some(iv_size) = context.iv_sizes.get(&track_id) else {
+        return Err(Error::InvalidData("No IV size found for track {}"));
+    };
+
     let mut ivs = Vec::new();
     for _ in 0..sample_count {
-        // TODO: This is not always 16 bytes. Can be 8 as well. Information to determine this is in 'senc' box.
-        let mut iv = [0; 16];
-        reader.read_exact(&mut iv)?;
+        let mut iv = Vec::with_capacity(*iv_size as usize);
+        reader.take(*iv_size as u64).read_to_end(&mut iv)?;
 
         let mut sub_samples = Vec::new();
         if use_sub_samples {
@@ -131,8 +141,9 @@ fn read_version0<R: Read + Seek>(
                 });
             }
         }
+
         ivs.push(SampleEncryption {
-            initialization_vector: InitializationVector::new_128_bit(iv),
+            initialization_vector: InitializationVector::new(iv)?,
             sub_samples,
         });
     }
@@ -259,7 +270,8 @@ mod tests {
         assert_eq!(header.name, BoxType::SencBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SencBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            SencBox::read_box(&mut reader, header.size, &mut Mp4Context::default(), 1).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

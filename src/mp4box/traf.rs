@@ -56,7 +56,7 @@ impl Mp4Box for TrafBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut tfhd = None;
@@ -66,6 +66,9 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
 
         let mut current = reader.stream_position()?;
         let end = start + size;
+
+        // The order here is important, as we need to know the track ID before reading the senc box.
+        let mut boxes: HashMap<BoxType, u64> = HashMap::new();
         while current < end {
             // Get box header.
             let header = BoxHeader::read(reader)?;
@@ -75,31 +78,47 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
                     "traf box contains a box with a larger size than it",
                 ));
             }
-
-            match name {
-                BoxType::TfhdBox => {
-                    tfhd = Some(TfhdBox::read_box(reader, s)?);
-                }
-                BoxType::TfdtBox => {
-                    tfdt = Some(TfdtBox::read_box(reader, s)?);
-                }
-                BoxType::TrunBox => {
-                    trun = Some(TrunBox::read_box(reader, s)?);
-                }
-                BoxType::SencBox => {
-                    senc = Some(SencBox::read_box(reader, s)?);
-                }
-                _ => {
-                    debug!("Skipping box: {:?}", name);
-                    skip_box(reader, s)?;
-                }
-            }
-
+            boxes.insert(name, s);
+            skip_box(reader, s)?;
             current = reader.stream_position()?;
+        }
+
+        if let Some(tfhd_start) = boxes.remove(&BoxType::TfhdBox) {
+            let header = BoxHeader::read(reader)?;
+            let BoxHeader { name: _, size: s } = header;
+            reader.seek(SeekFrom::Start(tfhd_start))?;
+            tfhd = Some(TfhdBox::read_box(reader, s, context)?);
         }
 
         if tfhd.is_none() {
             return Err(Error::BoxNotFound(BoxType::TfhdBox));
+        }
+
+        if let Some(tfdt_start) = boxes.remove(&BoxType::TfdtBox) {
+            let header = BoxHeader::read(reader)?;
+            let BoxHeader { name: _, size: s } = header;
+            reader.seek(SeekFrom::Start(tfdt_start))?;
+            tfdt = Some(TfdtBox::read_box(reader, s, context)?);
+        }
+
+        if let Some(trun_start) = boxes.remove(&BoxType::TrunBox) {
+            let header = BoxHeader::read(reader)?;
+            let BoxHeader { name: _, size: s } = header;
+            reader.seek(SeekFrom::Start(trun_start))?;
+            trun = Some(TrunBox::read_box(reader, s, context)?);
+        }
+
+        if let Some(senc_start) = boxes.remove(&BoxType::SencBox) {
+            let track_id = tfhd.as_ref().expect("checked above").track_id;
+
+            let header = BoxHeader::read(reader)?;
+            let BoxHeader { name: _, size: s } = header;
+            reader.seek(SeekFrom::Start(senc_start))?;
+            senc = Some(SencBox::read_box(reader, s, context, track_id)?);
+        }
+
+        for (name, _) in boxes {
+            debug!("Skipping box: {:?}", name);
         }
 
         skip_bytes_to(reader, start + size)?;

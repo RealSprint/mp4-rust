@@ -57,6 +57,7 @@
 //!
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::{Read, Seek, SeekFrom, Write};
 
@@ -169,7 +170,7 @@ pub const HEADER_EXT_SIZE: u64 = 4;
 
 macro_rules! boxtype {
     ($( $name:ident => $value:expr ),*) => {
-        #[derive(Clone, Copy, PartialEq, Eq)]
+        #[derive(Clone, Copy, PartialEq, Eq, Hash)]
         pub enum BoxType {
             $( $name, )*
             UnknownBox(u32),
@@ -277,8 +278,15 @@ pub trait Mp4Box: Sized {
     fn summary(&self) -> Result<String>;
 }
 
+// Context is used to pass information from other boxes
+#[derive(Debug, Clone, Default)]
+pub struct Mp4Context {
+    // Set when encryption is used
+    pub(crate) iv_sizes: HashMap<u32, u8>,
+}
+
 pub trait ReadBox<T>: Sized {
-    fn read_box(_: T, size: u64) -> Result<Self>;
+    fn read_box(_: T, size: u64, config: &mut Mp4Context) -> Result<Self>;
 }
 
 pub trait WriteBox<T>: Sized {

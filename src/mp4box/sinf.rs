@@ -7,7 +7,7 @@ use crate::skip_box;
 
 use super::{
     box_start, frma::FrmaBox, schi::SchiBox, schm::SchmBox, skip_bytes_to, BoxHeader, BoxType,
-    Error, Mp4Box, ReadBox, Result, WriteBox,
+    Error, Mp4Box, Mp4Context, ReadBox, Result, WriteBox,
 };
 
 // ISO 14496-12:2022 - 8.12.2 Protection Scheme Information Box
@@ -50,7 +50,7 @@ impl Mp4Box for SinfBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for SinfBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut current = reader.stream_position()?;
@@ -71,13 +71,13 @@ impl<R: Read + Seek> ReadBox<&mut R> for SinfBox {
 
             match name {
                 BoxType::FrmaBox => {
-                    frma = Some(FrmaBox::read_box(reader, s)?);
+                    frma = Some(FrmaBox::read_box(reader, s, context)?);
                 }
                 BoxType::SchiBox => {
-                    schi = Some(SchiBox::read_box(reader, s)?);
+                    schi = Some(SchiBox::read_box(reader, s, context)?);
                 }
                 BoxType::SchmBox => {
-                    schm = Some(SchmBox::read_box(reader, s)?);
+                    schm = Some(SchmBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -148,7 +148,7 @@ mod tests {
         assert_eq!(header.name, BoxType::SinfBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SinfBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = SinfBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -187,7 +187,7 @@ mod tests {
         assert_eq!(header.name, BoxType::SinfBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SinfBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = SinfBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(header.name, BoxType::SinfBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SinfBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = SinfBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -277,7 +277,7 @@ mod tests {
         assert_eq!(header.name, BoxType::SinfBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SinfBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = SinfBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

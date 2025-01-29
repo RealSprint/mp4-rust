@@ -48,7 +48,7 @@ impl Mp4Box for IlstBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for IlstBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut items = HashMap::new();
@@ -67,16 +67,28 @@ impl<R: Read + Seek> ReadBox<&mut R> for IlstBox {
 
             match name {
                 BoxType::NameBox => {
-                    items.insert(MetadataKey::Title, IlstItemBox::read_box(reader, s)?);
+                    items.insert(
+                        MetadataKey::Title,
+                        IlstItemBox::read_box(reader, s, context)?,
+                    );
                 }
                 BoxType::DayBox => {
-                    items.insert(MetadataKey::Year, IlstItemBox::read_box(reader, s)?);
+                    items.insert(
+                        MetadataKey::Year,
+                        IlstItemBox::read_box(reader, s, context)?,
+                    );
                 }
                 BoxType::CovrBox => {
-                    items.insert(MetadataKey::Poster, IlstItemBox::read_box(reader, s)?);
+                    items.insert(
+                        MetadataKey::Poster,
+                        IlstItemBox::read_box(reader, s, context)?,
+                    );
                 }
                 BoxType::DescBox => {
-                    items.insert(MetadataKey::Summary, IlstItemBox::read_box(reader, s)?);
+                    items.insert(
+                        MetadataKey::Summary,
+                        IlstItemBox::read_box(reader, s, context)?,
+                    );
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -124,7 +136,7 @@ impl IlstItemBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for IlstItemBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut data = None;
@@ -143,7 +155,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for IlstItemBox {
 
             match name {
                 BoxType::DataBox => {
-                    data = Some(DataBox::read_box(reader, s)?);
+                    data = Some(DataBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -232,7 +244,7 @@ mod tests {
         assert_eq!(header.name, BoxType::IlstBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = IlstBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = IlstBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -248,7 +260,7 @@ mod tests {
         assert_eq!(header.name, BoxType::IlstBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = IlstBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = IlstBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

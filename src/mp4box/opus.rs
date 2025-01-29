@@ -81,7 +81,7 @@ impl Mp4Box for OpusBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for OpusBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         reader.read_u32::<BigEndian>()?; // reserved
@@ -117,10 +117,10 @@ impl<R: Read + Seek> ReadBox<&mut R> for OpusBox {
 
             match name {
                 BoxType::DopsBox => {
-                    dops = Some(DopsBox::read_box(reader, s)?);
+                    dops = Some(DopsBox::read_box(reader, s, context)?);
                 }
                 BoxType::SinfBox => {
-                    sinf.push(SinfBox::read_box(reader, s)?);
+                    sinf.push(SinfBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -303,7 +303,7 @@ impl Mp4Box for DopsBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for DopsBox {
-    fn read_box(reader: &mut R, _size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, _size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let _start = box_start(reader)?;
         let version = reader.read_u8()?;
         let output_channel_count = reader.read_u8()?;
@@ -378,7 +378,8 @@ mod tests {
         assert_eq!(header.name, BoxType::OpusBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = OpusBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            OpusBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -406,7 +407,8 @@ mod tests {
         assert_eq!(header.name, BoxType::EncaBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = OpusBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            OpusBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

@@ -45,7 +45,7 @@ impl Mp4Box for UdtaBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for UdtaBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut meta = None;
@@ -64,7 +64,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for UdtaBox {
 
             match name {
                 BoxType::MetaBox => {
-                    meta = Some(MetaBox::read_box(reader, s)?);
+                    meta = Some(MetaBox::read_box(reader, s, context)?);
                 }
                 _ => {
                     debug!("Skipping box: {:?}", name);
@@ -112,7 +112,7 @@ mod tests {
         assert_eq!(header.name, BoxType::UdtaBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = UdtaBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = UdtaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 
@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(header.name, BoxType::UdtaBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = UdtaBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = UdtaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 }

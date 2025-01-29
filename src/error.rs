@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::mp4box::BoxType;
+use crate::{encryption::initialization_vector::InitializationVectorError, mp4box::BoxType};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -28,4 +28,6 @@ pub enum Error {
     UnsupportedBoxVersion(BoxType, u8),
     #[error("Not implemented")]
     NotImplemented,
+    #[error(transparent)]
+    InitializationVectorError(#[from] InitializationVectorError),
 }

@@ -47,7 +47,7 @@ impl Mp4Box for DataBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for DataBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let data_type = DataType::try_from(reader.read_u32::<BigEndian>()?)?;
@@ -96,7 +96,7 @@ mod tests {
         assert_eq!(header.name, BoxType::DataBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = DataBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = DataBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -112,7 +112,7 @@ mod tests {
         assert_eq!(header.name, BoxType::DataBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = DataBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = DataBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }
