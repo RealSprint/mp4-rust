@@ -11,7 +11,7 @@ use super::{
 // ISO 14496-12:2022 - 8.12.3 Original Format Box
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct FrmaBox {
-    pub(crate) data_format: FourCC,
+    pub data_format: FourCC,
 }
 
 impl FrmaBox {

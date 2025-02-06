@@ -144,7 +144,7 @@ fn read_version0<R: Read + Seek>(
 
         ivs.push(SampleEncryption {
             initialization_vector: InitializationVector::new(iv)?,
-            sub_samples,
+            subsamples: sub_samples,
         });
     }
 
@@ -189,11 +189,11 @@ impl<W: Write> WriteBox<&mut W> for SencBox {
 fn write_version0<W: Write>(writer: &mut W, senc: &SencBox) -> Result<()> {
     writer.write_u32::<BigEndian>(senc.sample_count)?;
     for iv in &senc.sample_encryption {
-        writer.write_all(&iv.initialization_vector.data)?;
+        writer.write_all(&iv.initialization_vector.data())?;
 
         if senc.use_sub_samples {
-            writer.write_u16::<BigEndian>(iv.sub_samples.len() as u16)?;
-            for sub_sample in &iv.sub_samples {
+            writer.write_u16::<BigEndian>(iv.subsamples.len() as u16)?;
+            for sub_sample in &iv.subsamples {
                 writer.write_u16::<BigEndian>(sub_sample.clear_data)?;
                 writer.write_u32::<BigEndian>(sub_sample.encrypted_data)?;
             }
@@ -227,7 +227,7 @@ mod tests {
                         0xe8, 0x6b, 0x4c, 0xa8, 0xae, 0x2c, 0x3f, 0xbd, //
                         0x88, 0x07, 0x41, 0x4f, 0x2a, 0xdf, 0x5a, 0xcc, //
                     ]),
-                    sub_samples: vec![SubSampleEncryption {
+                    subsamples: vec![SubSampleEncryption {
                         clear_data: 773,
                         encrypted_data: 19472,
                     }],
@@ -237,7 +237,7 @@ mod tests {
                         0xe8, 0x6b, 0x4c, 0xa8, 0xae, 0x2c, 0x3f, 0xbd, //
                         0x88, 0x07, 0x41, 0x4f, 0x2a, 0xdf, 0x5f, 0x8d, //
                     ]),
-                    sub_samples: vec![SubSampleEncryption {
+                    subsamples: vec![SubSampleEncryption {
                         clear_data: 19,
                         encrypted_data: 5632,
                     }],

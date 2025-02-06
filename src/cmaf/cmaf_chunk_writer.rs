@@ -5,7 +5,6 @@ use prft::PrftBox;
 
 use crate::mfhd::MfhdBox;
 use crate::mp4box::traf::TrafBox;
-
 use crate::tfhd::TfhdBox;
 use crate::trun::TrunBox;
 use crate::*;
@@ -124,7 +123,7 @@ impl From<Vp9Config> for CmafChunkConfig {
 }
 
 // TODO creation_time, modification_time
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CmafChunkWriter<W> {
     writer: W,
     traf: TrafBox,
@@ -235,6 +234,16 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     }
 
     pub fn write_sample(&mut self, sample: &Mp4Sample) -> Result<u64> {
+        if let Some(encryption) = &sample.encryption {
+            let use_subsample_encryption = !encryption.subsamples.is_empty();
+            let senc = self
+                .traf
+                .senc
+                .get_or_insert(senc::SencBox::new(use_subsample_encryption));
+
+            senc.add_iv(encryption.clone());
+        }
+
         self.samples.push(sample.bytes.clone());
         self.traf.tfdt.get_or_insert(tfdt::TfdtBox {
             version: 1,
@@ -265,11 +274,6 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
 
         if trun.sample_cts.iter().any(|cts| *cts != 0) {
             trun.flags |= TrunBox::FLAG_SAMPLE_CTS;
-        }
-
-        if let Some(data) = sample.encryption.as_ref() {
-            let senc = self.traf.senc.get_or_insert(senc::SencBox::new(true));
-            senc.add_iv(data.clone());
         }
 
         let duration: u32 = trun.duration();

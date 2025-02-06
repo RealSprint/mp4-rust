@@ -49,8 +49,8 @@ impl TencBox {
             default_skip_byte_block: None,
 
             default_is_protected: true,
-            default_per_sample_iv_size: iv.size,
-            default_kid: iv.data,
+            default_per_sample_iv_size: iv.size(),
+            default_kid: iv.data(),
 
             default_constant_iv_size: None,
             default_constant_iv: None,
@@ -66,8 +66,8 @@ impl TencBox {
             default_per_sample_iv_size: 0,
             default_kid: [0; 16],
 
-            default_constant_iv_size: Some(iv.size),
-            default_constant_iv: Some(iv.data),
+            default_constant_iv_size: Some(iv.size()),
+            default_constant_iv: Some(iv.data()),
         }
     }
 
@@ -85,21 +85,6 @@ impl TencBox {
             .unwrap_or(0) as u64;
 
         base_size + dynamic_size
-    }
-
-    // TODO: Include the type Kid/constant
-    pub fn get_initialization_vector(&self) -> Option<InitializationVector> {
-        if !self.default_is_protected {
-            return None;
-        }
-
-        match (self.default_constant_iv_size, self.default_constant_iv) {
-            (Some(size), Some(iv)) => Some(InitializationVector { size, data: iv }),
-            _ => Some(InitializationVector {
-                size: self.default_per_sample_iv_size,
-                data: self.default_kid,
-            }),
-        }
     }
 }
 

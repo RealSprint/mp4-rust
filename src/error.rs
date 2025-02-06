@@ -26,6 +26,8 @@ pub enum Error {
     EntryInTrunNotFound(u32, BoxType, u32),
     #[error("{0} version {1} is not supported")]
     UnsupportedBoxVersion(BoxType, u8),
+    #[error("Not applicable for media type")]
+    NotApplicableForMediaType,
     #[error("Not implemented")]
     NotImplemented,
     #[error(transparent)]

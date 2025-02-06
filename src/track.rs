@@ -782,6 +782,20 @@ impl Mp4Track {
         }
     }
 
+    pub fn nal_header_length(&self) -> Result<u8> {
+        if let Some(avc1) = self.trak.mdia.minf.stbl.stsd.avc1.as_ref() {
+            Ok(avc1.avcc.length_size_minus_one + 1)
+        } else if let Some(hev1) = self.trak.mdia.minf.stbl.stsd.hev1.as_ref() {
+            Ok(hev1.hvcc.length_size_minus_one + 1)
+        } else if let Some(_av01) = self.trak.mdia.minf.stbl.stsd.av01.as_ref() {
+            Err(Error::NotImplemented)
+        } else if let Some(_vp09) = self.trak.mdia.minf.stbl.stsd.vp09.as_ref() {
+            Err(Error::NotImplemented)
+        } else {
+            Err(Error::NotApplicableForMediaType)
+        }
+    }
+
     pub(crate) fn read_sample<R: Read + Seek>(
         &mut self,
         reader: &mut R,
