@@ -68,7 +68,8 @@ impl PsshBox {
 
     pub fn get_size(&self) -> u64 {
         let kid_size = if self.version > 0 {
-            4 + 16 * self.kid_count.unwrap() as u64
+            let kid_count = self.kid_count.expect("always set for version > 0") as u64;
+            4 + 16 * kid_count
         } else {
             0
         };
@@ -89,7 +90,7 @@ impl Mp4Box for PsshBox {
     }
 
     fn to_json(&self) -> Result<String> {
-        Ok(serde_json::to_string(&self).unwrap())
+        Ok(serde_json::to_string(&self).unwrap_or_default())
     }
 
     fn summary(&self) -> Result<String> {
@@ -207,7 +208,8 @@ mod tests {
         assert_eq!(header.name, BoxType::PsshBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -245,7 +247,8 @@ mod tests {
         assert_eq!(header.name, BoxType::PsshBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }
