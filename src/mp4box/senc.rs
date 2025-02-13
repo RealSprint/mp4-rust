@@ -22,15 +22,18 @@ pub struct SencBox {
     sample_count: u32,
 
     pub(crate) sample_encryption: Vec<SampleEncryption>,
+
+    iv_size: u8,
 }
 
 impl SencBox {
-    pub fn new(use_sub_samples: bool) -> Self {
+    pub fn new(use_sub_samples: bool, iv_size: u8) -> Self {
         Self {
             version: 0,
             use_sub_samples,
             sample_count: 0,
             sample_encryption: Vec::new(),
+            iv_size,
         }
     }
 
@@ -48,11 +51,16 @@ impl SencBox {
             .sample_encryption
             .iter()
             .map(|e| {
-                16 + if self.use_sub_samples {
-                    2 + e.sub_samples().len() as u64 * 6
-                } else {
-                    0
+                let mut size = 0;
+                if let Some(iv) = &e.initialization_vector {
+                    size += iv.data().len() as u64;
                 }
+
+                if self.use_sub_samples {
+                    size += 2 + e.sub_samples().len() as u64 * 6
+                }
+
+                size
             })
             .sum::<u64>();
 
@@ -142,8 +150,14 @@ fn read_version0<R: Read + Seek>(
             }
         }
 
+        let iv = if *iv_size != 0 {
+            Some(InitializationVector::new(iv)?)
+        } else {
+            None
+        };
+
         ivs.push(SampleEncryption {
-            initialization_vector: InitializationVector::new(iv)?,
+            initialization_vector: iv,
             subsamples: sub_samples,
         });
     }
@@ -153,6 +167,7 @@ fn read_version0<R: Read + Seek>(
         version: 0,
         sample_encryption: ivs,
         use_sub_samples,
+        iv_size: *iv_size,
     })
 }
 
@@ -189,7 +204,9 @@ impl<W: Write> WriteBox<&mut W> for SencBox {
 fn write_version0<W: Write>(writer: &mut W, senc: &SencBox) -> Result<()> {
     writer.write_u32::<BigEndian>(senc.sample_count)?;
     for iv in &senc.sample_encryption {
-        writer.write_all(&iv.initialization_vector.data())?;
+        if let Some(iv) = &iv.initialization_vector {
+            writer.write_all(&iv.data())?;
+        }
 
         if senc.use_sub_samples {
             writer.write_u16::<BigEndian>(iv.subsamples.len() as u16)?;
@@ -216,27 +233,28 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn test_senc_v1_with_sub_samples() {
+    fn test_senc_v0_with_sub_samples() {
         let src_box = SencBox {
+            iv_size: 16,
             sample_count: 2,
             version: 0,
             use_sub_samples: true,
             sample_encryption: vec![
                 SampleEncryption {
-                    initialization_vector: InitializationVector::new_128_bit([
+                    initialization_vector: Some(InitializationVector::new_128_bit([
                         0xe8, 0x6b, 0x4c, 0xa8, 0xae, 0x2c, 0x3f, 0xbd, //
                         0x88, 0x07, 0x41, 0x4f, 0x2a, 0xdf, 0x5a, 0xcc, //
-                    ]),
+                    ])),
                     subsamples: vec![SubSampleEncryption {
                         clear_data: 773,
                         encrypted_data: 19472,
                     }],
                 },
                 SampleEncryption {
-                    initialization_vector: InitializationVector::new_128_bit([
+                    initialization_vector: Some(InitializationVector::new_128_bit([
                         0xe8, 0x6b, 0x4c, 0xa8, 0xae, 0x2c, 0x3f, 0xbd, //
                         0x88, 0x07, 0x41, 0x4f, 0x2a, 0xdf, 0x5f, 0x8d, //
-                    ]),
+                    ])),
                     subsamples: vec![SubSampleEncryption {
                         clear_data: 19,
                         encrypted_data: 5632,
@@ -270,8 +288,55 @@ mod tests {
         assert_eq!(header.name, BoxType::SencBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box =
-            SencBox::read_box(&mut reader, header.size, &mut Mp4Context::default(), 1).unwrap();
+        let mut context = Mp4Context {
+            iv_sizes: vec![(1, 16)].into_iter().collect(),
+        };
+
+        let dst_box = SencBox::read_box(&mut reader, header.size, &mut context, 1).unwrap();
+        assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_senc_v0_without_iv() {
+        let src_box = SencBox {
+            iv_size: 16,
+            sample_count: 2,
+            version: 0,
+            use_sub_samples: false,
+            sample_encryption: vec![
+                SampleEncryption {
+                    initialization_vector: None,
+                    subsamples: vec![],
+                },
+                SampleEncryption {
+                    initialization_vector: None,
+                    subsamples: vec![],
+                },
+            ],
+        };
+
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+        assert_eq!(buf.len(), src_box.box_size() as usize);
+
+        let expected = vec![
+            0x00, 0x00, 0x00, 0x10, b's', b'e', b'n', b'c', // header
+            0x00, 0x00, 0x00, 0x00, // header ext
+            0x00, 0x00, 0x00, 0x02, // sample_count
+        ];
+
+        assert_eq!(buf, expected);
+
+        let mut reader = Cursor::new(&buf);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::SencBox);
+        assert_eq!(src_box.box_size(), header.size);
+
+        let mut context = Mp4Context {
+            iv_sizes: vec![(1, 0)].into_iter().collect(),
+        };
+
+        let dst_box = SencBox::read_box(&mut reader, header.size, &mut context, 1).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

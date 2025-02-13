@@ -57,14 +57,15 @@ impl TencBox {
         }
     }
 
-    pub fn new_constant_iv_protected(iv: InitializationVector) -> Self {
+    pub fn new_constant_iv_protected(iv: InitializationVector, default_kid: [u8; 16]) -> Self {
         TencBox {
-            default_crypt_byte_block: None,
-            default_skip_byte_block: None,
+            // ISO 23001-7:2023 - 10.4.2 - recommended 10% partial encryption
+            default_crypt_byte_block: Some(1),
+            default_skip_byte_block: Some(9),
 
             default_is_protected: true,
             default_per_sample_iv_size: 0,
-            default_kid: [0; 16],
+            default_kid,
 
             default_constant_iv_size: Some(iv.size()),
             default_constant_iv: Some(iv.data()),
@@ -120,8 +121,8 @@ impl<R: Read + Seek> ReadBox<&mut R> for TencBox {
 
         let temp = reader.read_u8()?;
         let (default_crypt_byte_block, default_skip_byte_block) = if version != 0 {
-            let default_crypt_byte_block = temp & 0x0F;
-            let default_skip_byte_block = (temp & 0xF0) >> 4;
+            let default_crypt_byte_block = (temp & 0xF0) >> 4;
+            let default_skip_byte_block = temp & 0x0F;
 
             (
                 Some(default_crypt_byte_block),
@@ -189,7 +190,7 @@ impl<W: Write> WriteBox<&mut W> for TencBox {
         writer.write_u8(0)?;
 
         let temp = match (self.default_skip_byte_block, self.default_crypt_byte_block) {
-            (Some(skip), Some(crypt)) => (skip << 4) | (crypt),
+            (Some(skip), Some(crypt)) => (crypt << 4) | (skip),
             _ => 0,
         };
 
@@ -320,7 +321,8 @@ mod tests {
         let data = [
             0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
         ];
-        let src_box = TencBox::new_constant_iv_protected(InitializationVector::new_64_bit(data));
+        let src_box =
+            TencBox::new_constant_iv_protected(InitializationVector::new_64_bit(data), [0; 16]);
 
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -328,7 +330,7 @@ mod tests {
 
         let expected = vec![
             0x00, 0x00, 0x00, 0x29, b't', b'e', b'n', b'c', //
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, //
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x19, 0x01, 0x00, //
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
             0x08, 0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, //
@@ -353,7 +355,8 @@ mod tests {
             0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
             0xb8, 0xea, 0xef, 0x6b, 0xbf, 0x58, 0x2d, 0x8e, //
         ];
-        let src_box = TencBox::new_constant_iv_protected(InitializationVector::new_128_bit(data));
+        let src_box =
+            TencBox::new_constant_iv_protected(InitializationVector::new_128_bit(data), [0; 16]);
 
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();

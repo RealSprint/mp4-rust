@@ -94,6 +94,7 @@ pub(crate) mod pasp;
 pub mod prft;
 pub mod pssh;
 pub(crate) mod psuedo_boxes;
+pub(crate) mod saiz;
 pub mod schi;
 pub mod schm;
 pub(crate) mod senc;
@@ -268,7 +269,8 @@ boxtype! {
     SinfBox => 0x73696e66,
     EncvBox => 0x656e6376,
     EncaBox => 0x656e6361,
-    SencBox => 0x73656e63
+    SencBox => 0x73656e63,
+    SaizBox => 0x7361697A
 }
 
 pub trait Mp4Box: Sized {

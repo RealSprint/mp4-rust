@@ -6,6 +6,8 @@ use tracing::debug;
 use crate::mp4box::*;
 use crate::mp4box::{tfdt::TfdtBox, tfhd::TfhdBox, trun::TrunBox};
 
+use super::saiz::SaizBox;
+
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct TrafBox {
     pub tfhd: TfhdBox,
@@ -13,6 +15,7 @@ pub struct TrafBox {
     pub trun: Option<TrunBox>,
 
     pub senc: Option<SencBox>,
+    pub saiz: Option<SaizBox>,
 }
 
 impl TrafBox {
@@ -31,6 +34,9 @@ impl TrafBox {
         }
         if let Some(ref senc) = self.senc {
             size += senc.box_size();
+        }
+        if let Some(ref saiz) = self.saiz {
+            size += saiz.box_size();
         }
         size
     }
@@ -63,6 +69,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
         let mut tfdt = None;
         let mut trun = None;
         let mut senc = None;
+        let mut saiz = None;
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -117,6 +124,13 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
             senc = Some(SencBox::read_box(reader, s, context, track_id)?);
         }
 
+        if let Some(saiz_start) = boxes.remove(&BoxType::SaizBox) {
+            reader.seek(SeekFrom::Start(saiz_start))?;
+            let header = BoxHeader::read(reader)?;
+            let BoxHeader { name: _, size: s } = header;
+            saiz = Some(SaizBox::read_box(reader, s, context)?);
+        }
+
         for (name, _) in boxes {
             debug!("Skipping box: {:?}", name);
         }
@@ -128,6 +142,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
             tfdt,
             trun,
             senc,
+            saiz,
         })
     }
 }
@@ -149,6 +164,10 @@ impl<W: Write> WriteBox<&mut W> for TrafBox {
 
         if let Some(ref senc) = self.senc {
             senc.write_box(writer)?;
+        }
+
+        if let Some(ref saiz) = self.saiz {
+            saiz.write_box(writer)?;
         }
 
         Ok(size)

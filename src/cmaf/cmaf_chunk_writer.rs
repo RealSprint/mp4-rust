@@ -152,6 +152,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             tfdt: None,
             trun: None,
             senc: None,
+            saiz: None,
         };
 
         let mfhd = MfhdBox {
@@ -236,11 +237,15 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     pub fn write_sample(&mut self, sample: &Mp4Sample) -> Result<u64> {
         if let Some(encryption) = &sample.encryption {
             let use_subsample_encryption = !encryption.subsamples.is_empty();
-            let senc = self
-                .traf
-                .senc
-                .get_or_insert(senc::SencBox::new(use_subsample_encryption));
+            let senc = self.traf.senc.get_or_insert(senc::SencBox::new(
+                use_subsample_encryption,
+                encryption
+                    .initialization_vector
+                    .as_ref()
+                    .map_or(0, |iv| iv.size()),
+            ));
 
+            // We could also add a saiz box here, but it doesn't seem to be needed, and I have no idea what to put for sample size
             senc.add_iv(encryption.clone());
         }
 

@@ -4,7 +4,7 @@ use super::initialization_vector::InitializationVector;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct SampleEncryption {
-    pub initialization_vector: InitializationVector,
+    pub initialization_vector: Option<InitializationVector>,
     pub subsamples: Vec<SubSampleEncryption>,
 }
 
