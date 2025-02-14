@@ -19,6 +19,7 @@ pub struct Mp4Reader<R> {
 
     tracks: HashMap<u32, Mp4Track>,
     size: u64,
+    context: Mp4Context,
 }
 
 impl<R: Read + Seek> Mp4Reader<R> {
@@ -148,6 +149,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
             prfts,
             size,
             tracks,
+            context,
         })
     }
 
@@ -162,7 +164,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
         let mut prfts = Vec::new();
         let mut moof_offsets = Vec::new();
         let mut emsgs = Vec::new();
-        let mut context = Mp4Context::default();
+        let mut context = self.context.clone();
 
         let mut current = start;
         while current < size {
@@ -254,6 +256,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
             prfts,
             tracks,
             size,
+            context,
         })
     }
 
