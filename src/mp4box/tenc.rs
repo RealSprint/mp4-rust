@@ -57,11 +57,15 @@ impl TencBox {
         }
     }
 
-    pub fn new_constant_iv_protected(iv: InitializationVector, default_kid: [u8; 16]) -> Self {
+    pub fn new_constant_iv_protected(
+        iv: InitializationVector,
+        default_kid: [u8; 16],
+        crypt: Option<u8>,
+        skip: Option<u8>,
+    ) -> Self {
         TencBox {
-            // ISO 23001-7:2023 - 10.4.2 - recommended 10% partial encryption
-            default_crypt_byte_block: Some(1),
-            default_skip_byte_block: Some(9),
+            default_crypt_byte_block: crypt,
+            default_skip_byte_block: skip,
 
             default_is_protected: true,
             default_per_sample_iv_size: 0,
@@ -321,8 +325,12 @@ mod tests {
         let data = [
             0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
         ];
-        let src_box =
-            TencBox::new_constant_iv_protected(InitializationVector::new_64_bit(data), [0; 16]);
+        let src_box = TencBox::new_constant_iv_protected(
+            InitializationVector::new_64_bit(data),
+            [0; 16],
+            Some(1),
+            Some(9),
+        );
 
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -355,8 +363,12 @@ mod tests {
             0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
             0xb8, 0xea, 0xef, 0x6b, 0xbf, 0x58, 0x2d, 0x8e, //
         ];
-        let src_box =
-            TencBox::new_constant_iv_protected(InitializationVector::new_128_bit(data), [0; 16]);
+        let src_box = TencBox::new_constant_iv_protected(
+            InitializationVector::new_128_bit(data),
+            [0; 16],
+            Some(1),
+            Some(9),
+        );
 
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
