@@ -49,7 +49,7 @@ impl<W> CmafHeaderWriter<W> {
     /// };
     ///
     /// let data = Cursor::new(Vec::<u8>::new());
-    /// let mut writer = mp4::CmafHeaderWriter::write_start(data, &config)?;
+    /// let mut writer = mp4::CmafHeaderWriter::write_start(data, &config, None)?;
     /// writer.write_end()?;
     ///
     /// let data: Vec<u8> = writer.into_writer().into_inner();
@@ -187,9 +187,6 @@ mod tests {
 
         let data: Vec<u8> = writer.into_writer().into_inner();
         let size = data.len() as u64;
-
-        let mut file = File::create("header.mp4").unwrap();
-        file.write_all(&data).unwrap();
 
         let reader = BufReader::new(Cursor::new(data));
         Mp4Reader::read_header(reader, size)?;
