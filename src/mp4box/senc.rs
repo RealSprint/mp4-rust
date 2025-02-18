@@ -299,7 +299,7 @@ mod tests {
     #[test]
     fn test_senc_v0_without_iv() {
         let src_box = SencBox {
-            iv_size: 16,
+            iv_size: 0,
             sample_count: 2,
             version: 0,
             use_sub_samples: false,
