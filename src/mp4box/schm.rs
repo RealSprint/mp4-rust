@@ -71,16 +71,10 @@ impl<R: Read + Seek> ReadBox<&mut R> for SchmBox {
 
         let scheme_uri = if flags & 1 == 1 {
             let scheme_uri_size = (size - SCHM_BOX_SIZE - 1) as usize;
-            let mut scheme_uri = String::with_capacity(scheme_uri_size);
-
-            loop {
-                let c = reader.read_u8()?;
-
-                if c == 0 {
-                    break;
-                }
-                scheme_uri.push(c.into());
-            }
+            let mut buf = vec![0u8; scheme_uri_size];
+            reader.read_exact(&mut buf)?;
+            let scheme_uri = String::from_utf8(buf)
+                .map_err(|_| crate::Error::InvalidData("invalid schm scheme uri"))?;
 
             Some(scheme_uri)
         } else {
