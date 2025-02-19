@@ -80,7 +80,7 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
             timescale: track.timescale(),
             language: track.language().to_string(),
             media_conf,
-            sinf: track.get_sinf(),
+            sinf: track.get_sinf().cloned().unwrap_or_default(),
         };
 
         mp4_writer.add_track(&track_conf)?;

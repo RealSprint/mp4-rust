@@ -155,7 +155,7 @@ impl Mp4Track {
         self.encryption_data.extend(data);
     }
 
-    pub fn get_sinf(&self) -> Vec<SinfBox> {
+    pub fn get_sinf(&self) -> Option<&Vec<SinfBox>> {
         self.trak.mdia.minf.stbl.stsd.get_sinf()
     }
 

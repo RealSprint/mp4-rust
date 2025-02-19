@@ -43,23 +43,23 @@ impl StsdBox {
         BoxType::StsdBox
     }
 
-    pub fn get_sinf(&self) -> Vec<SinfBox> {
+    pub fn get_sinf(&self) -> Option<&Vec<SinfBox>> {
         if let Some(ref avc1) = self.avc1 {
-            avc1.sinf.clone()
+            Some(&avc1.sinf)
         } else if let Some(ref hev1) = self.hev1 {
-            hev1.sinf.clone()
+            Some(&hev1.sinf)
         } else if let Some(ref _vp09) = self.vp09 {
-            Vec::new()
+            None
         } else if let Some(ref av01) = self.av01 {
-            av01.sinf.clone()
+            Some(&av01.sinf)
         } else if let Some(ref mp4a) = self.mp4a {
-            mp4a.sinf.clone()
+            Some(&mp4a.sinf)
         } else if let Some(ref opus) = self.opus {
-            opus.sinf.clone()
+            Some(&opus.sinf)
         } else if let Some(ref _tx3g) = self.tx3g {
-            Vec::new()
+            None
         } else {
-            Vec::new()
+            None
         }
     }
 

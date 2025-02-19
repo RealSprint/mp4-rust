@@ -334,10 +334,12 @@ fn find_iv_size(tracks: &HashMap<u32, Mp4Track>) -> HashMap<u32, u8> {
         .iter()
         .filter_map(|(track_id, track)| {
             // Should be fine to just get the value from a single sinf box, as the iv size needs to be the same for all samples.
-            let iv_size = track.get_sinf().iter().find_map(|sinf| {
-                sinf.schi
-                    .as_ref()
-                    .map(|schi| schi.tenc.default_per_sample_iv_size)
+            let iv_size = track.get_sinf().and_then(|sinf| {
+                sinf.iter().find_map(|sinf| {
+                    sinf.schi
+                        .as_ref()
+                        .map(|schi| schi.tenc.default_per_sample_iv_size)
+                })
             });
 
             Some((*track_id, iv_size?))
