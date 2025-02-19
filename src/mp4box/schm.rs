@@ -69,7 +69,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for SchmBox {
         let scheme_type: FourCC = reader.read_u32::<BigEndian>()?.into();
         let scheme_version = reader.read_u32::<BigEndian>()?;
 
-        let scheme_uri = if flags & 1 == 1 {
+        let scheme_uri = if flags & 0x000001 == 1 {
             let scheme_uri_size = (size - SCHM_BOX_SIZE - 1) as usize;
             let mut buf = vec![0u8; scheme_uri_size];
             reader.read_exact(&mut buf)?;
