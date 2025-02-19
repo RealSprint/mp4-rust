@@ -172,11 +172,11 @@ fn read_version0<R: Read + Seek>(
 }
 
 fn read_version1<R: Read + Seek>(_reader: &mut R, _size: u64) -> Result<SencBox> {
-    Err(Error::NotImplemented)
+    Err(Error::NotImplemented("senc version 1".to_string()))
 }
 
 fn read_version2<R: Read + Seek>(_reader: &mut R, _size: u64) -> Result<SencBox> {
-    Err(Error::NotImplemented)
+    Err(Error::NotImplemented("senc version 2".to_string()))
 }
 
 impl<W: Write> WriteBox<&mut W> for SencBox {
@@ -220,10 +220,10 @@ fn write_version0<W: Write>(writer: &mut W, senc: &SencBox) -> Result<()> {
     Ok(())
 }
 fn write_version1<W: Write>(_writer: &mut W, _senc: &SencBox) -> Result<()> {
-    Err(Error::NotImplemented)
+    Err(Error::NotImplemented("senc version 1".to_string()))
 }
 fn write_version2<W: Write>(_writer: &mut W, _senc: &SencBox) -> Result<()> {
-    Err(Error::NotImplemented)
+    Err(Error::NotImplemented("senc version 2".to_string()))
 }
 
 #[cfg(test)]

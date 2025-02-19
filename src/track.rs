@@ -788,9 +788,13 @@ impl Mp4Track {
         } else if let Some(hev1) = self.trak.mdia.minf.stbl.stsd.hev1.as_ref() {
             Ok(hev1.hvcc.length_size_minus_one + 1)
         } else if let Some(_av01) = self.trak.mdia.minf.stbl.stsd.av01.as_ref() {
-            Err(Error::NotImplemented)
+            Err(Error::NotImplemented(
+                "nal_header_length for AV1".to_string(),
+            ))
         } else if let Some(_vp09) = self.trak.mdia.minf.stbl.stsd.vp09.as_ref() {
-            Err(Error::NotImplemented)
+            Err(Error::NotImplemented(
+                "nal_header_length for VP9".to_string(),
+            ))
         } else {
             Err(Error::NotApplicableForMediaType)
         }

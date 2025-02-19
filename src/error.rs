@@ -29,8 +29,8 @@ pub enum Error {
     UnsupportedBoxVersion(BoxType, u8),
     #[error("Not applicable for media type")]
     NotApplicableForMediaType,
-    #[error("Not implemented")]
-    NotImplemented,
+    #[error("Not implemented - {0}")]
+    NotImplemented(String),
     #[error(transparent)]
     InitializationVectorError(#[from] InitializationVectorError),
     #[error(transparent)]
