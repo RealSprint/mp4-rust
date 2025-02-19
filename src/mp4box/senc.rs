@@ -127,7 +127,7 @@ fn read_version0<R: Read + Seek>(
     let sample_count = reader.read_u32::<BigEndian>()?;
 
     let Some(iv_size) = context.iv_sizes.get(&track_id) else {
-        return Err(Error::InvalidData("No IV size found for track {}"));
+        return Err(Error::InvalidData("No IV size found for track"));
     };
 
     let mut ivs = Vec::new();
