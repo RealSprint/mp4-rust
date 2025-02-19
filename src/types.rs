@@ -241,13 +241,13 @@ pub enum MediaType {
 impl MediaType {
     pub fn to_four_cc_format(&self) -> FourCC {
         match self {
-            MediaType::H264 => FourCC::from(*b"avc1"),
-            MediaType::H265 => FourCC::from(*b"hev1"),
-            MediaType::AV1 => FourCC::from(*b"av01"),
-            MediaType::VP9 => FourCC::from(*b"vp09"),
-            MediaType::AAC => FourCC::from(*b"mp4a"),
-            MediaType::OPUS => FourCC::from(*b"Opus"),
-            MediaType::TTXT => FourCC::from(*b"tx3g"),
+            MediaType::H264 => FourCC::from(BoxType::Avc1Box),
+            MediaType::H265 => FourCC::from(BoxType::Hev1Box),
+            MediaType::AV1 => FourCC::from(BoxType::Av01Box),
+            MediaType::VP9 => FourCC::from(BoxType::Vp09Box),
+            MediaType::AAC => FourCC::from(BoxType::Mp4aBox),
+            MediaType::OPUS => FourCC::from(BoxType::OpusBox),
+            MediaType::TTXT => FourCC::from(BoxType::Tx3gBox),
         }
     }
 }
