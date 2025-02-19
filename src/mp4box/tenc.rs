@@ -210,9 +210,7 @@ impl<W: Write> WriteBox<&mut W> for TencBox {
             match (&self.default_constant_iv_size, &self.default_constant_iv) {
                 (Some(size), Some(iv)) => {
                     writer.write_u8(*size)?;
-                    for i in 0..*size {
-                        writer.write_u8(iv[i as usize])?;
-                    }
+                    writer.write_all(&iv.as_slice()[0..*size as usize])?;
                 }
                 _ => {
                     return Err(Error::InvalidData(
