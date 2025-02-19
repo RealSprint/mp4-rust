@@ -1,5 +1,6 @@
-use std::io::{Read, Seek, Write};
+use std::io::{Cursor, Read, Seek, Write};
 
+use base64::{prelude::BASE64_STANDARD, Engine};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
@@ -24,6 +25,23 @@ pub struct PsshBox {
 }
 
 impl PsshBox {
+    pub fn from_base64(base64: &str) -> Result<Self> {
+        let data = BASE64_STANDARD.decode(base64.as_bytes())?;
+
+        let mut reader = Cursor::new(&data);
+        let header = BoxHeader::read(&mut reader)?;
+
+        PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default())
+    }
+
+    pub fn new_clearkey() -> Self {
+        let system_id = [
+            0x10, 0x77, 0xef, 0xec, 0xc0, 0xb2, 0x4d, 0x02, //
+            0xac, 0xe3, 0x3c, 0x1e, 0x52, 0xe2, 0xfb, 0x4b, //
+        ];
+        Self::new(system_id, vec![])
+    }
+
     pub fn new(system_id: [u8; 16], data: Vec<u8>) -> Self {
         PsshBox {
             version: 0,
@@ -250,5 +268,37 @@ mod tests {
         let dst_box =
             PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn widevine() {
+        let base64 =
+            "AAAAP3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAAB8SEKIFDqR9T0FWsI36mib6TasaBWV6ZHJtSPPGiZsG";
+        let data = BASE64_STANDARD.decode(base64.as_bytes()).unwrap();
+
+        let mut reader = Cursor::new(&data);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::PsshBox);
+
+        let dst_box =
+            PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+
+        let k = 1;
+        assert_eq!(k, dst_box.data_size)
+    }
+
+    #[test]
+    fn playready() {
+        let p = "000002be70737368000000009a04f07998404286ab92e65be0885f950000029e9e0200000100010094023c00570052004d00480045004100440045005200200078006d006c006e0073003d00220068007400740070003a002f002f0073006300680065006d00610073002e006d006900630072006f0073006f00660074002e0063006f006d002f00440052004d002f0032003000300037002f00300033002f0050006c00610079005200650061006400790048006500610064006500720022002000760065007200730069006f006e003d00220034002e0033002e0030002e00300022003e003c0044004100540041003e003c00500052004f00540045004300540049004e0046004f003e003c004b004900440053003e003c004b0049004400200041004c004700490044003d00220041004500530043004200430022002000560041004c00550045003d00220070004100340046006f006b003900390056006b00470077006a006600710061004a00760070004e00710077003d003d0022003e003c002f004b00490044003e003c002f004b004900440053003e003c002f00500052004f00540045004300540049004e0046004f003e003c004c0041005f00550052004c003e00680074007400700073003a002f002f0070006c0061007900720065006100640079002e0065007a00640072006d002e0063006f006d002f00630065006e00630079002f0070007200650061007500740068002e0061007300700078003f00700058003d004600360031003400440031003c002f004c0041005f00550052004c003e003c00440053005f00490044003e0056006c005200370049006400730049004a004500750052006400300036004c0061007100730032006a0077003d003d003c002f00440053005f00490044003e003c002f0044004100540041003e003c002f00570052004d004800450041004400450052003e00";
+        let data = hex::decode(p).unwrap();
+        let mut reader = Cursor::new(&data);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::PsshBox);
+
+        let dst_box =
+            PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+
+        let k = 1;
+        assert_eq!(k, dst_box.data_size)
     }
 }

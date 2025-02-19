@@ -1,3 +1,4 @@
+use base64::DecodeError;
 use thiserror::Error;
 
 use crate::{encryption::initialization_vector::InitializationVectorError, mp4box::BoxType};
@@ -32,4 +33,8 @@ pub enum Error {
     NotImplemented,
     #[error(transparent)]
     InitializationVectorError(#[from] InitializationVectorError),
+    #[error(transparent)]
+    FromHexError(#[from] hex::FromHexError),
+    #[error(transparent)]
+    DecodeError(#[from] DecodeError),
 }

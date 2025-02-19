@@ -14,8 +14,10 @@ include = ["src", "benches", "Cargo.toml", "README", "LICENSE"]
 
 [dependencies]
 thiserror = "^1.0"
+base64 = "0.22.1"
 byteorder = "1"
 bytes = "1.1.0"
+hex = "0.4.2"
 num-rational = { version = "0.4.0", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
