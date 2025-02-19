@@ -110,9 +110,7 @@ impl<W: Write> WriteBox<&mut W> for SchmBox {
         writer.write_u32::<BigEndian>(self.scheme_version)?;
 
         if let Some(ref scheme_uri) = self.scheme_uri {
-            for c in scheme_uri.chars() {
-                writer.write_u8(c as u8)?;
-            }
+            writer.write_all(scheme_uri.as_bytes())?;
             writer.write_u8(0)?;
         }
 
