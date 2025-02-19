@@ -66,11 +66,7 @@ impl InitializationVector {
 
     pub fn data(&self) -> [u8; 16] {
         match self.size {
-            8 => {
-                let mut data = [0; 16];
-                data[..8].copy_from_slice(&u64::to_be_bytes(self.value as u64));
-                data
-            }
+            8 => u128::to_be_bytes(self.value << 64),
             16 => u128::to_be_bytes(self.value),
             _ => unreachable!(),
         }
