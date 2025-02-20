@@ -9,7 +9,7 @@ use super::{
 };
 
 // ISO 23001-7:2023 - 8.1 Protection System Specific Header Box
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Hash)]
 pub struct PsshBox {
     version: u8,
     flags: u32,
