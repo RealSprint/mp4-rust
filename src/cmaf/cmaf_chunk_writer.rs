@@ -334,12 +334,53 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
 #[cfg(test)]
 mod tests {
 
-    use std::io::{Cursor, Read};
+    use std::io::Cursor;
 
     use super::*;
 
     #[test]
     fn test_chunk() -> Result<()> {
+        let config = CmafHeaderConfig {
+            major_brand: str::parse("iso6").unwrap(),
+            minor_version: 512,
+            compatible_brands: vec![
+                str::parse("iso6").unwrap(),
+                str::parse("cmfc").unwrap(),
+                str::parse("mp41").unwrap(),
+            ],
+            timescale: 1000,
+        };
+        let data = Cursor::new(Vec::<u8>::new());
+
+        let mut writer = CmafHeaderWriter::write_start(data, &config, None)?;
+
+        writer.add_track(&TrackConfig {
+            track_type: TrackType::Video,
+            timescale: 1000,
+            language: "finne".to_string(),
+            media_conf: MediaConfig::AvcConfig(AvcConfig {
+                width: 1920,
+                height: 1080,
+                seq_param_set: [
+                    103, 66, 192, 31, 149, 160, 20, 1, 110, 192, 90, 128, 128, 128, 160, 0, 0, 125,
+                    0, 0, 29, 76, 28, 0, 0, 4, 196, 176, 0, 2, 98, 90, 221, 229, 193, 64,
+                ]
+                .to_vec(),
+                pic_param_set: [104, 206, 60, 128].to_vec(),
+                color: Some(ColorConfig {
+                    color_primaries: 1,
+                    transfer_characteristics: 1,
+                    matrix_coefficients: 1,
+                    full_range: false,
+                }),
+                aspect_ratio: Some((1, 1)),
+            }),
+        })?;
+
+        writer.write_end()?;
+
+        let data = writer.into_writer().into_inner();
+
         let config = CmafChunkConfig {
             timescale: 1000,
             default_sample_duration: 10,
@@ -347,7 +388,9 @@ mod tests {
             default_sample_flags: 0,
             producer_reference_time: None,
         };
-        let data = Cursor::new(Vec::<u8>::new());
+        let size = data.len();
+        let mut data = Cursor::new(data);
+        data.set_position(size as u64);
 
         let mut writer = CmafChunkWriter::write_start(data, 1, &config)?;
 
@@ -362,19 +405,11 @@ mod tests {
 
         writer.write_end(1)?;
 
-        let mut data: Vec<u8> = writer.into_writer().into_inner();
+        let data: Vec<u8> = writer.into_writer().into_inner();
 
-        let mut file = File::create("chunk.mp4").unwrap();
-        file.write_all(&data).unwrap();
+        let size = data.len() as u64;
 
-        let mut header = File::open("header.mp4").unwrap();
-        let mut buffer = vec![0; header.metadata().unwrap().len() as usize];
-        header.read_exact(&mut buffer).unwrap();
-        buffer.append(&mut data);
-        let size = buffer.len() as u64;
-        let mp4 = Mp4Reader::read_header(Cursor::new(buffer), size)?;
-
-        println!("{:?}", mp4);
+        Mp4Reader::read_header(Cursor::new(data), size)?;
 
         Ok(())
     }

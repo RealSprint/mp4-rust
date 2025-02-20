@@ -36,11 +36,11 @@ impl<W> CmafHeaderWriter<W> {
     /// # Examples
     ///
     /// ```rust
-    /// use mp4::{CmafWriter, CmafConfig};
+    /// use mp4::{CmafHeaderWriter, CmafHeaderConfig};
     /// use std::io::Cursor;
     ///
     /// # fn main() -> mp4::Result<()> {
-    /// let config = CmafConfig {
+    /// let config = CmafHeaderConfig {
     ///     major_brand: str::parse("iso6").unwrap(),
     ///     minor_version: 512,
     ///     compatible_brands: vec![
@@ -53,7 +53,7 @@ impl<W> CmafHeaderWriter<W> {
     /// };
     ///
     /// let data = Cursor::new(Vec::<u8>::new());
-    /// let mut writer = mp4::CmafWriter::write_start(data, &config)?;
+    /// let mut writer = mp4::CmafHeaderWriter::write_start(data, &config, None)?;
     /// writer.write_end()?;
     ///
     /// let data: Vec<u8> = writer.into_writer().into_inner();
@@ -197,9 +197,6 @@ mod tests {
 
         let data: Vec<u8> = writer.into_writer().into_inner();
         let size = data.len() as u64;
-
-        let mut file = File::create("header.mp4").unwrap();
-        file.write_all(&data).unwrap();
 
         let reader = BufReader::new(Cursor::new(data));
         Mp4Reader::read_header(reader, size)?;
