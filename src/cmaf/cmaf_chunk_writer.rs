@@ -349,6 +349,7 @@ mod tests {
                 str::parse("mp41").unwrap(),
             ],
             timescale: 1000,
+            pssh: Vec::new(),
         };
         let data = Cursor::new(Vec::<u8>::new());
 
@@ -375,6 +376,7 @@ mod tests {
                 }),
                 aspect_ratio: Some((1, 1)),
             }),
+            sinf: Vec::new(),
         })?;
 
         writer.write_end()?;
