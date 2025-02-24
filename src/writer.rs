@@ -1,4 +1,5 @@
 use byteorder::{BigEndian, WriteBytesExt};
+use pssh::PsshBox;
 use std::io::{Seek, SeekFrom, Write};
 
 use crate::mp4box::*;
@@ -11,6 +12,7 @@ pub struct Mp4Config {
     pub minor_version: u32,
     pub compatible_brands: Vec<FourCC>,
     pub timescale: u32,
+    pub pssh: Vec<PsshBox>,
 }
 
 #[derive(Debug)]
@@ -20,6 +22,7 @@ pub struct Mp4Writer<W> {
     mdat_pos: u64,
     timescale: u32,
     duration: u64,
+    pssh: Vec<PsshBox>,
 }
 
 impl<W> Mp4Writer<W> {
@@ -45,6 +48,7 @@ impl<W> Mp4Writer<W> {
     ///         str::parse("mp41").unwrap(),
     ///     ],
     ///     timescale: 1000,
+    ///     pssh: Vec::new(),
     /// };
     ///
     /// let data = Cursor::new(Vec::<u8>::new());
@@ -82,6 +86,7 @@ impl<W: Write + Seek> Mp4Writer<W> {
             mdat_pos,
             timescale,
             duration,
+            pssh: config.pssh.clone(),
         })
     }
 
@@ -140,9 +145,13 @@ impl<W: Write + Seek> Mp4Writer<W> {
 
         moov.mvhd.timescale = self.timescale;
         moov.mvhd.duration = self.duration;
+
+        moov.pssh = self.pssh.clone();
+
         if moov.mvhd.duration > (u32::MAX as u64) {
             moov.mvhd.version = 1
         }
+
         moov.write_box(&mut self.writer)?;
         Ok(())
     }

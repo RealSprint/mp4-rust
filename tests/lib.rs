@@ -44,6 +44,7 @@ fn test_read_mp4() {
             rendering_offset: 0,
             is_sync: true,
             bytes: mp4::Bytes::from(vec![0x0u8; 751]),
+            encryption: None,
         }
     );
     let eos = mp4.read_sample(1, 2).unwrap();
@@ -61,6 +62,7 @@ fn test_read_mp4() {
             rendering_offset: 0,
             is_sync: true,
             bytes: mp4::Bytes::from(vec![0x0u8; 179]),
+            encryption: None,
         }
     );
 
@@ -73,6 +75,7 @@ fn test_read_mp4() {
             rendering_offset: 0,
             is_sync: true,
             bytes: mp4::Bytes::from(vec![0x0u8; 180]),
+            encryption: None,
         }
     );
 
@@ -85,6 +88,7 @@ fn test_read_mp4() {
             rendering_offset: 0,
             is_sync: true,
             bytes: mp4::Bytes::from(vec![0x0u8; 160]),
+            encryption: None,
         }
     );
 
@@ -204,6 +208,7 @@ fn test_read_fragments() {
             rendering_offset: 0,
             is_sync: true,
             bytes: mp4::Bytes::from(vec![0x0u8; 751]),
+            encryption: None,
         }
     );
     let eos = mp4_fragment.read_sample(1, 2);

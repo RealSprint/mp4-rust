@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::mp4box::*;
 use crate::mp4box::{
@@ -74,7 +75,7 @@ impl Mp4Box for StblBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for StblBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut stsd = None;
@@ -100,31 +101,31 @@ impl<R: Read + Seek> ReadBox<&mut R> for StblBox {
 
             match name {
                 BoxType::StsdBox => {
-                    stsd = Some(StsdBox::read_box(reader, s)?);
+                    stsd = Some(StsdBox::read_box(reader, s, context)?);
                 }
                 BoxType::SttsBox => {
-                    stts = Some(SttsBox::read_box(reader, s)?);
+                    stts = Some(SttsBox::read_box(reader, s, context)?);
                 }
                 BoxType::CttsBox => {
-                    ctts = Some(CttsBox::read_box(reader, s)?);
+                    ctts = Some(CttsBox::read_box(reader, s, context)?);
                 }
                 BoxType::StssBox => {
-                    stss = Some(StssBox::read_box(reader, s)?);
+                    stss = Some(StssBox::read_box(reader, s, context)?);
                 }
                 BoxType::StscBox => {
-                    stsc = Some(StscBox::read_box(reader, s)?);
+                    stsc = Some(StscBox::read_box(reader, s, context)?);
                 }
                 BoxType::StszBox => {
-                    stsz = Some(StszBox::read_box(reader, s)?);
+                    stsz = Some(StszBox::read_box(reader, s, context)?);
                 }
                 BoxType::StcoBox => {
-                    stco = Some(StcoBox::read_box(reader, s)?);
+                    stco = Some(StcoBox::read_box(reader, s, context)?);
                 }
                 BoxType::Co64Box => {
-                    co64 = Some(Co64Box::read_box(reader, s)?);
+                    co64 = Some(Co64Box::read_box(reader, s, context)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

@@ -5,7 +5,6 @@ use prft::PrftBox;
 
 use crate::mfhd::MfhdBox;
 use crate::mp4box::traf::TrafBox;
-
 use crate::tfhd::TfhdBox;
 use crate::trun::TrunBox;
 use crate::*;
@@ -124,7 +123,7 @@ impl From<Vp9Config> for CmafChunkConfig {
 }
 
 // TODO creation_time, modification_time
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CmafChunkWriter<W> {
     writer: W,
     traf: TrafBox,
@@ -152,6 +151,8 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             tfhd,
             tfdt: None,
             trun: None,
+            senc: None,
+            saiz: None,
         };
 
         let mfhd = MfhdBox {
@@ -234,6 +235,20 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     }
 
     pub fn write_sample(&mut self, sample: &Mp4Sample) -> Result<u64> {
+        if let Some(encryption) = &sample.encryption {
+            let use_subsample_encryption = !encryption.subsamples.is_empty();
+            let senc = self.traf.senc.get_or_insert(senc::SencBox::new(
+                use_subsample_encryption,
+                encryption
+                    .initialization_vector
+                    .as_ref()
+                    .map_or(0, |iv| iv.size()),
+            ));
+
+            // We could also add a saiz box here, but it doesn't seem to be needed, and I have no idea what to put for sample size
+            senc.add_iv(encryption.clone());
+        }
+
         self.samples.push(sample.bytes.clone());
         self.traf.tfdt.get_or_insert(tfdt::TfdtBox {
             version: 1,
@@ -334,6 +349,7 @@ mod tests {
                 str::parse("mp41").unwrap(),
             ],
             timescale: 1000,
+            pssh: Vec::new(),
         };
         let data = Cursor::new(Vec::<u8>::new());
 
@@ -360,6 +376,7 @@ mod tests {
                 }),
                 aspect_ratio: Some((1, 1)),
             }),
+            sinf: Vec::new(),
         })?;
 
         writer.write_end()?;
@@ -385,6 +402,7 @@ mod tests {
             rendering_offset: 10,
             is_sync: true,
             bytes: Bytes::from_static(&[0, 0, 0, 0, 0, 0, 0]),
+            encryption: None,
         })?;
 
         writer.write_end(1)?;

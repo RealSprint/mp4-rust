@@ -1,6 +1,8 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
+use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::{colr::ColrBox, mp4box::*, pasp::PaspBox};
 
@@ -20,6 +22,8 @@ pub struct Avc1Box {
     pub avcc: AvcCBox,
     pub colr: Option<ColrBox>,
     pub pasp: Option<PaspBox>,
+
+    pub sinf: Vec<SinfBox>,
 }
 
 impl Default for Avc1Box {
@@ -35,6 +39,7 @@ impl Default for Avc1Box {
             avcc: AvcCBox::default(),
             colr: None,
             pasp: None,
+            sinf: Vec::new(),
         }
     }
 }
@@ -60,11 +65,19 @@ impl Avc1Box {
                     numerator: *numerator,
                     denumerator: *denumerator,
                 }),
+            sinf: Vec::new(),
         }
     }
 
+    pub fn is_encrypted(&self) -> bool {
+        !self.sinf.is_empty()
+    }
+
     pub fn get_type(&self) -> BoxType {
-        BoxType::Avc1Box
+        match self.is_encrypted() {
+            true => BoxType::EncvBox,
+            false => BoxType::Avc1Box,
+        }
     }
 
     pub fn get_size(&self) -> u64 {
@@ -77,6 +90,8 @@ impl Avc1Box {
         if let Some(pasp) = &self.pasp {
             size += pasp.box_size();
         }
+
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
 
         size
     }
@@ -105,7 +120,7 @@ impl Mp4Box for Avc1Box {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         reader.read_u32::<BigEndian>()?; // reserved
@@ -128,6 +143,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
         let mut avcc = None;
         let mut colr = None;
         let mut pasp = None;
+        let mut sinf = Vec::new();
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -143,16 +159,19 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
 
             match name {
                 BoxType::AvcCBox => {
-                    avcc = Some(AvcCBox::read_box(reader, s)?);
+                    avcc = Some(AvcCBox::read_box(reader, s, context)?);
                 }
                 BoxType::ColrBox => {
-                    colr = Some(ColrBox::read_box(reader, s)?);
+                    colr = Some(ColrBox::read_box(reader, s, context)?);
                 }
                 BoxType::PaspBox => {
-                    pasp = Some(PaspBox::read_box(reader, s)?);
+                    pasp = Some(PaspBox::read_box(reader, s, context)?);
+                }
+                BoxType::SinfBox => {
+                    sinf.push(SinfBox::read_box(reader, s, context)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }
@@ -176,6 +195,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Avc1Box {
             avcc,
             colr,
             pasp,
+            sinf,
         })
     }
 }
@@ -211,6 +231,10 @@ impl<W: Write> WriteBox<&mut W> for Avc1Box {
 
         if let Some(pasp) = &self.pasp {
             pasp.write_box(writer)?;
+        }
+
+        for sinf in self.sinf.iter() {
+            sinf.write_box(writer)?;
         }
 
         Ok(size)
@@ -269,7 +293,7 @@ impl Mp4Box for AvcCBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for AvcCBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let configuration_version = reader.read_u8()?;
@@ -392,6 +416,7 @@ mod tests {
             },
             colr: None,
             pasp: None,
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -402,7 +427,50 @@ mod tests {
         assert_eq!(header.name, BoxType::Avc1Box);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Avc1Box::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Avc1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_avc1_with_sinf() {
+        let src_box = Avc1Box {
+            data_reference_index: 1,
+            width: 320,
+            height: 240,
+            horizresolution: FixedPointU16::new(0x48),
+            vertresolution: FixedPointU16::new(0x48),
+            frame_count: 1,
+            depth: 24,
+            avcc: AvcCBox {
+                configuration_version: 1,
+                avc_profile_indication: 100,
+                profile_compatibility: 0,
+                avc_level_indication: 13,
+                length_size_minus_one: 3,
+                sequence_parameter_sets: vec![NalUnit {
+                    bytes: vec![
+                        0x67, 0x64, 0x00, 0x0D, 0xAC, 0xD9, 0x41, 0x41, 0xFA, 0x10, 0x00, 0x00,
+                        0x03, 0x00, 0x10, 0x00, 0x00, 0x03, 0x03, 0x20, 0xF1, 0x42, 0x99, 0x60,
+                    ],
+                }],
+                picture_parameter_sets: vec![NalUnit {
+                    bytes: vec![0x68, 0xEB, 0xE3, 0xCB, 0x22, 0xC0],
+                }],
+            },
+            colr: None,
+            pasp: None,
+            sinf: vec![SinfBox::default()],
+        };
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+        assert_eq!(buf.len(), src_box.box_size() as usize);
+
+        let mut reader = Cursor::new(&buf);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::EncvBox);
+        assert_eq!(src_box.box_size(), header.size);
+
+        let dst_box = Avc1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

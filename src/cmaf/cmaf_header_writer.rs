@@ -1,6 +1,8 @@
 use std::io::{Seek, Write};
 use std::time::Duration;
 
+use pssh::PsshBox;
+
 use crate::mp4box::*;
 use crate::mvex::MvexBox;
 use crate::track::Mp4TrackWriter;
@@ -13,6 +15,7 @@ pub struct CmafHeaderConfig {
     pub minor_version: u32,
     pub compatible_brands: Vec<FourCC>,
     pub timescale: u32,
+    pub pssh: Vec<PsshBox>,
 }
 
 #[derive(Debug)]
@@ -21,6 +24,7 @@ pub struct CmafHeaderWriter<W> {
     tracks: Vec<Mp4TrackWriter>,
     timescale: u32,
     duration: Duration,
+    pssh: Vec<PsshBox>,
 }
 
 impl<W> CmafHeaderWriter<W> {
@@ -46,6 +50,7 @@ impl<W> CmafHeaderWriter<W> {
     ///         str::parse("mp41").unwrap(),
     ///     ],
     ///     timescale: 1000,
+    ///     pssh: Vec::new(),
     /// };
     ///
     /// let data = Cursor::new(Vec::<u8>::new());
@@ -80,6 +85,7 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
             tracks,
             timescale,
             duration: duration.unwrap_or(Duration::from_secs(0)),
+            pssh: config.pssh.clone(),
         })
     }
 
@@ -125,6 +131,9 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
         moov.mvhd.next_track_id = 2;
         moov.mvhd.timescale = self.timescale;
         moov.mvhd.duration = duration;
+
+        moov.pssh = self.pssh.clone();
+
         if moov.mvhd.duration > (u32::MAX as u64) {
             moov.mvhd.version = 1
         }
@@ -155,12 +164,14 @@ mod tests {
                 str::parse("mp41").unwrap(),
             ],
             timescale: 1000,
+            pssh: vec![],
         };
         let data = Cursor::new(Vec::<u8>::new());
 
         let mut writer = CmafHeaderWriter::write_start(data, &config, None)?;
 
         writer.add_track(&TrackConfig {
+            sinf: Vec::new(),
             track_type: TrackType::Video,
             timescale: 1000,
             language: "finne".to_string(),

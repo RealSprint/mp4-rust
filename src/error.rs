@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::mp4box::BoxType;
+use crate::{encryption::initialization_vector::InitializationVectorError, mp4box::BoxType};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -26,4 +26,10 @@ pub enum Error {
     EntryInTrunNotFound(u32, BoxType, u32),
     #[error("{0} version {1} is not supported")]
     UnsupportedBoxVersion(BoxType, u8),
+    #[error("Not applicable for media type")]
+    NotApplicableForMediaType,
+    #[error("Not implemented - {0}")]
+    NotImplemented(String),
+    #[error(transparent)]
+    InitializationVectorError(#[from] InitializationVectorError),
 }

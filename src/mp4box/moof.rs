@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::mp4box::*;
 use crate::mp4box::{mfhd::MfhdBox, traf::TrafBox};
@@ -22,6 +23,7 @@ impl MoofBox {
         for traf in self.trafs.iter() {
             size += traf.box_size();
         }
+
         size
     }
 }
@@ -46,7 +48,7 @@ impl Mp4Box for MoofBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for MoofBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut mfhd = None;
@@ -66,14 +68,15 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoofBox {
 
             match name {
                 BoxType::MfhdBox => {
-                    mfhd = Some(MfhdBox::read_box(reader, s)?);
+                    mfhd = Some(MfhdBox::read_box(reader, s, context)?);
                 }
                 BoxType::TrafBox => {
-                    let traf = TrafBox::read_box(reader, s)?;
+                    let traf = TrafBox::read_box(reader, s, context)?;
                     trafs.push(traf);
                 }
+
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }
@@ -102,6 +105,7 @@ impl<W: Write> WriteBox<&mut W> for MoofBox {
         for traf in self.trafs.iter() {
             traf.write_box(writer)?;
         }
+
         Ok(0)
     }
 }

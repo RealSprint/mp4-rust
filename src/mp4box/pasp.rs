@@ -40,7 +40,7 @@ impl Mp4Box for PaspBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for PaspBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let numerator = reader.read_u32::<BigEndian>()?;
@@ -88,7 +88,7 @@ mod tests {
         assert_eq!(header.name, BoxType::PaspBox);
         assert_eq!(pasp_box.box_size(), header.size);
 
-        let dst_box = PaspBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = PaspBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(pasp_box, dst_box);
     }
 
@@ -107,7 +107,7 @@ mod tests {
         assert_eq!(header.name, BoxType::PaspBox);
         assert_eq!(pasp_box.box_size(), header.size);
 
-        let dst_box = PaspBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = PaspBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(pasp_box, dst_box);
     }
 }

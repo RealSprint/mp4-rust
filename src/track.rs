@@ -1,5 +1,8 @@
 use bytes::BytesMut;
+use encryption::sample_encryption::SampleEncryption;
+use sinf::SinfBox;
 use std::cmp;
+use std::collections::VecDeque;
 use std::convert::TryFrom;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::time::Duration;
@@ -24,6 +27,7 @@ pub struct TrackConfig {
     pub timescale: u32,
     pub language: String,
     pub media_conf: MediaConfig,
+    pub sinf: Vec<SinfBox>,
 }
 
 impl From<MediaConfig> for TrackConfig {
@@ -47,6 +51,7 @@ impl From<AvcConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AvcConfig(avc_conf),
+            sinf: Vec::new(),
         }
     }
 }
@@ -58,6 +63,7 @@ impl From<HevcConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::HevcConfig(hevc_conf),
+            sinf: Vec::new(),
         }
     }
 }
@@ -69,6 +75,7 @@ impl From<Av1Config> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::Av1Config(av1_conf),
+            sinf: Vec::new(),
         }
     }
 }
@@ -80,6 +87,7 @@ impl From<AacConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AacConfig(aac_conf),
+            sinf: Vec::new(),
         }
     }
 }
@@ -91,6 +99,7 @@ impl From<OpusConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::OpusConfig(opus_conf),
+            sinf: Vec::new(),
         }
     }
 }
@@ -102,6 +111,7 @@ impl From<TtxtConfig> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::TtxtConfig(txtt_conf),
+            sinf: Vec::new(),
         }
     }
 }
@@ -113,6 +123,7 @@ impl From<Vp9Config> for TrackConfig {
             timescale: 1000,               // XXX
             language: String::from("und"), // XXX
             media_conf: MediaConfig::Vp9Config(vp9_conf),
+            sinf: Vec::new(),
         }
     }
 }
@@ -125,6 +136,7 @@ pub struct Mp4Track {
 
     // Fragmented Tracks Defaults.
     pub default_sample_duration: u32,
+    encryption_data: VecDeque<SampleEncryption>,
 }
 
 impl Mp4Track {
@@ -135,7 +147,16 @@ impl Mp4Track {
             trafs: Vec::new(),
             moof_offsets: Vec::new(),
             default_sample_duration: 0,
+            encryption_data: VecDeque::new(),
         }
+    }
+
+    pub fn add_encryption_data(&mut self, data: Vec<SampleEncryption>) {
+        self.encryption_data.extend(data);
+    }
+
+    pub fn get_sinf(&self) -> Option<&Vec<SinfBox>> {
+        self.trak.mdia.minf.stbl.stsd.get_sinf()
     }
 
     pub fn track_id(&self) -> u32 {
@@ -761,8 +782,26 @@ impl Mp4Track {
         }
     }
 
+    pub fn nal_header_length(&self) -> Result<u8> {
+        if let Some(avc1) = self.trak.mdia.minf.stbl.stsd.avc1.as_ref() {
+            Ok(avc1.avcc.length_size_minus_one + 1)
+        } else if let Some(hev1) = self.trak.mdia.minf.stbl.stsd.hev1.as_ref() {
+            Ok(hev1.hvcc.length_size_minus_one + 1)
+        } else if let Some(_av01) = self.trak.mdia.minf.stbl.stsd.av01.as_ref() {
+            Err(Error::NotImplemented(
+                "nal_header_length for AV1".to_string(),
+            ))
+        } else if let Some(_vp09) = self.trak.mdia.minf.stbl.stsd.vp09.as_ref() {
+            Err(Error::NotImplemented(
+                "nal_header_length for VP9".to_string(),
+            ))
+        } else {
+            Err(Error::NotApplicableForMediaType)
+        }
+    }
+
     pub(crate) fn read_sample<R: Read + Seek>(
-        &self,
+        &mut self,
         reader: &mut R,
         sample_id: u32,
     ) -> Result<Option<Mp4Sample>> {
@@ -785,12 +824,15 @@ impl Mp4Track {
         let rendering_offset = self.sample_rendering_offset(sample_id);
         let is_sync = self.is_sync_sample(sample_id);
 
+        let encryption_data = self.encryption_data.pop_front();
+
         Ok(Some(Mp4Sample {
             start_time,
             duration,
             rendering_offset,
             is_sync,
             bytes: Bytes::from(buffer),
+            encryption: encryption_data,
         }))
     }
 }
@@ -819,6 +861,7 @@ impl Mp4TrackWriter {
         trak.mdia.mdhd.language = config.language.to_owned();
         trak.mdia.hdlr.handler_type = config.track_type.into();
         trak.mdia.minf.stbl.co64 = Some(Co64Box::default());
+
         match config.media_conf {
             MediaConfig::AvcConfig(ref avc_config) => {
                 trak.tkhd.set_width(avc_config.width);
@@ -827,7 +870,8 @@ impl Mp4TrackWriter {
                 let vmhd = VmhdBox::default();
                 trak.mdia.minf.vmhd = Some(vmhd);
 
-                let avc1 = Avc1Box::new(avc_config);
+                let mut avc1 = Avc1Box::new(avc_config);
+                avc1.sinf = config.sinf.clone();
                 trak.mdia.minf.stbl.stsd.avc1 = Some(avc1);
             }
             MediaConfig::HevcConfig(ref hevc_config) => {
@@ -837,7 +881,8 @@ impl Mp4TrackWriter {
                 let vmhd = VmhdBox::default();
                 trak.mdia.minf.vmhd = Some(vmhd);
 
-                let hev1 = Hev1Box::new(hevc_config);
+                let mut hev1 = Hev1Box::new(hevc_config);
+                hev1.sinf = config.sinf.clone();
                 trak.mdia.minf.stbl.stsd.hev1 = Some(hev1);
             }
             MediaConfig::Vp9Config(ref config) => {
@@ -856,7 +901,8 @@ impl Mp4TrackWriter {
                 let smhd = SmhdBox::default();
                 trak.mdia.minf.smhd = Some(smhd);
 
-                let mp4a = Mp4aBox::new(aac_config);
+                let mut mp4a = Mp4aBox::new(aac_config);
+                mp4a.sinf = config.sinf.clone();
                 trak.mdia.minf.stbl.stsd.mp4a = Some(mp4a);
             }
             MediaConfig::TtxtConfig(ref _ttxt_config) => {
@@ -864,7 +910,10 @@ impl Mp4TrackWriter {
                 trak.mdia.minf.stbl.stsd.tx3g = Some(tx3g);
             }
             MediaConfig::OpusConfig(ref opus_config) => {
-                let opus = OpusBox::new(opus_config);
+                let mut opus = OpusBox::new(opus_config);
+
+                opus.sinf = config.sinf.clone();
+
                 trak.mdia.minf.stbl.stsd.opus = Some(opus);
             }
         }

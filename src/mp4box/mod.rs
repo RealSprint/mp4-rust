@@ -57,6 +57,7 @@
 //!
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::io::{Read, Seek, SeekFrom, Write};
 
@@ -72,6 +73,7 @@ pub(crate) mod dinf;
 pub(crate) mod edts;
 pub(crate) mod elst;
 pub(crate) mod emsg;
+pub mod frma;
 pub(crate) mod ftyp;
 pub(crate) mod hdlr;
 pub mod hev1;
@@ -90,6 +92,13 @@ pub(crate) mod mvhd;
 pub mod opus;
 pub(crate) mod pasp;
 pub mod prft;
+pub mod pssh;
+pub(crate) mod psuedo_boxes;
+pub(crate) mod saiz;
+pub mod schi;
+pub mod schm;
+pub(crate) mod senc;
+pub mod sinf;
 pub(crate) mod smhd;
 pub(crate) mod stbl;
 pub(crate) mod stco;
@@ -98,6 +107,7 @@ pub(crate) mod stsd;
 pub(crate) mod stss;
 pub(crate) mod stsz;
 pub(crate) mod stts;
+pub mod tenc;
 pub(crate) mod tfdt;
 pub(crate) mod tfhd;
 pub(crate) mod tkhd;
@@ -161,7 +171,7 @@ pub const HEADER_EXT_SIZE: u64 = 4;
 
 macro_rules! boxtype {
     ($( $name:ident => $value:expr ),*) => {
-        #[derive(Clone, Copy, PartialEq, Eq)]
+        #[derive(Clone, Copy, PartialEq, Eq, Hash)]
         pub enum BoxType {
             $( $name, )*
             UnknownBox(u32),
@@ -250,7 +260,17 @@ boxtype! {
     DescBox => 0x64657363,
     WideBox => 0x77696465,
     WaveBox => 0x77617665,
-    PrftBox => 0x70726674
+    PrftBox => 0x70726674,
+    FrmaBox => 0x66726d61,
+    SchmBox => 0x7363686d,
+    TencBox => 0x74656e63,
+    PsshBox => 0x70737368,
+    SchiBox => 0x73636869,
+    SinfBox => 0x73696e66,
+    EncvBox => 0x656e6376,
+    EncaBox => 0x656e6361,
+    SencBox => 0x73656e63,
+    SaizBox => 0x7361697A
 }
 
 pub trait Mp4Box: Sized {
@@ -260,8 +280,15 @@ pub trait Mp4Box: Sized {
     fn summary(&self) -> Result<String>;
 }
 
+// Context is used to pass information from other boxes
+#[derive(Debug, Clone, Default)]
+pub struct Mp4Context {
+    // Set when encryption is used
+    pub(crate) iv_sizes: HashMap<u32, u8>,
+}
+
 pub trait ReadBox<T>: Sized {
-    fn read_box(_: T, size: u64) -> Result<Self>;
+    fn read_box(_: T, size: u64, config: &mut Mp4Context) -> Result<Self>;
 }
 
 pub trait WriteBox<T>: Sized {

@@ -1,6 +1,8 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
+use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::mp4box::*;
 
@@ -18,6 +20,8 @@ pub struct Hev1Box {
     pub frame_count: u16,
     pub depth: u16,
     pub hvcc: HvcCBox,
+
+    pub sinf: Vec<SinfBox>,
 }
 
 impl Default for Hev1Box {
@@ -31,6 +35,7 @@ impl Default for Hev1Box {
             frame_count: 1,
             depth: 0x0018,
             hvcc: HvcCBox::default(),
+            sinf: Vec::new(),
         }
     }
 }
@@ -46,15 +51,27 @@ impl Hev1Box {
             frame_count: 1,
             depth: 0x0018,
             hvcc: HvcCBox::new(),
+            sinf: Vec::new(),
         }
     }
 
+    pub fn is_encrypted(&self) -> bool {
+        !self.sinf.is_empty()
+    }
+
     pub fn get_type(&self) -> BoxType {
-        BoxType::Hev1Box
+        match self.is_encrypted() {
+            true => BoxType::EncvBox,
+            false => BoxType::Hev1Box,
+        }
     }
 
     pub fn get_size(&self) -> u64 {
-        HEADER_SIZE + 8 + 70 + self.hvcc.box_size()
+        let mut size = HEADER_SIZE + 8 + 70 + self.hvcc.box_size();
+
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
+
+        size
     }
 }
 
@@ -81,7 +98,7 @@ impl Mp4Box for Hev1Box {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for Hev1Box {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         reader.read_u32::<BigEndian>()?; // reserved
@@ -101,31 +118,54 @@ impl<R: Read + Seek> ReadBox<&mut R> for Hev1Box {
         let depth = reader.read_u16::<BigEndian>()?;
         reader.read_i16::<BigEndian>()?; // pre-defined
 
-        let header = BoxHeader::read(reader)?;
-        let BoxHeader { name, size: s } = header;
-        if s > size {
-            return Err(Error::InvalidData(
-                "hev1 box contains a box with a larger size than it",
-            ));
-        }
-        if name == BoxType::HvcCBox {
-            let hvcc = HvcCBox::read_box(reader, s)?;
+        let mut hvcc = None;
+        let mut sinf = Vec::new();
 
-            skip_bytes_to(reader, start + size)?;
+        let mut current = reader.stream_position()?;
+        let end = start + size;
+        while current < end {
+            let header = BoxHeader::read(reader)?;
+            let BoxHeader { name, size: s } = header;
 
-            Ok(Hev1Box {
-                data_reference_index,
-                width,
-                height,
-                horizresolution,
-                vertresolution,
-                frame_count,
-                depth,
-                hvcc,
-            })
-        } else {
-            Err(Error::InvalidData("hvcc not found"))
+            if s > size {
+                return Err(Error::InvalidData(
+                    "hev1 box contains a box with a larger size than it",
+                ));
+            }
+
+            match name {
+                BoxType::HvcCBox => {
+                    hvcc = Some(HvcCBox::read_box(reader, s, context)?);
+                }
+                BoxType::SinfBox => {
+                    sinf.push(SinfBox::read_box(reader, s, context)?);
+                }
+                _ => {
+                    debug!("Skipping box: {:?}", name);
+                    skip_box(reader, s)?;
+                }
+            }
+
+            current = reader.stream_position()?;
         }
+
+        let Some(hvcc) = hvcc else {
+            return Err(Error::InvalidData("hvcc not found"));
+        };
+
+        skip_bytes_to(reader, start + size)?;
+
+        Ok(Hev1Box {
+            data_reference_index,
+            width,
+            height,
+            horizresolution,
+            vertresolution,
+            frame_count,
+            depth,
+            hvcc,
+            sinf,
+        })
     }
 }
 
@@ -153,6 +193,10 @@ impl<W: Write> WriteBox<&mut W> for Hev1Box {
         writer.write_i16::<BigEndian>(-1)?; // pre-defined
 
         self.hvcc.write_box(writer)?;
+
+        for sinf in &self.sinf {
+            sinf.write_box(writer)?;
+        }
 
         Ok(size)
     }
@@ -209,7 +253,7 @@ impl Mp4Box for HvcCBox {
     }
 
     fn summary(&self) -> Result<String> {
-        Ok(format!("configuration_version={} general_profile_space={} general_tier_flag={} general_profile_idc={} general_profile_compatibility_flags={} general_constraint_indicator_flag={} general_level_idc={} min_spatial_segmentation_idc={} parallelism_type={} chroma_format_idc={} bit_depth_luma_minus8={} bit_depth_chroma_minus8={} avg_frame_rate={} constant_frame_rate={} num_temporal_layers={} temporal_id_nested={} length_size_minus_one={}", 
+        Ok(format!("configuration_version={} general_profile_space={} general_tier_flag={} general_profile_idc={} general_profile_compatibility_flags={} general_constraint_indicator_flag={} general_level_idc={} min_spatial_segmentation_idc={} parallelism_type={} chroma_format_idc={} bit_depth_luma_minus8={} bit_depth_chroma_minus8={} avg_frame_rate={} constant_frame_rate={} num_temporal_layers={} temporal_id_nested={} length_size_minus_one={}",
             self.configuration_version,
             self.general_profile_space,
             self.general_tier_flag,
@@ -245,7 +289,7 @@ pub struct HvcCArray {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for HvcCBox {
-    fn read_box(reader: &mut R, _size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, _size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let configuration_version = reader.read_u8()?;
         let params = reader.read_u8()?;
         let general_profile_space = params & 0b11000000 >> 6;
@@ -379,6 +423,7 @@ mod tests {
                 configuration_version: 1,
                 ..Default::default()
             },
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -389,7 +434,38 @@ mod tests {
         assert_eq!(header.name, BoxType::Hev1Box);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Hev1Box::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            Hev1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_hev1_with_sinf() {
+        let src_box = Hev1Box {
+            data_reference_index: 1,
+            width: 320,
+            height: 240,
+            horizresolution: FixedPointU16::new(0x48),
+            vertresolution: FixedPointU16::new(0x48),
+            frame_count: 1,
+            depth: 24,
+            hvcc: HvcCBox {
+                configuration_version: 1,
+                ..Default::default()
+            },
+            sinf: vec![SinfBox::default()],
+        };
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+        assert_eq!(buf.len(), src_box.box_size() as usize);
+
+        let mut reader = Cursor::new(&buf);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::EncvBox);
+        assert_eq!(src_box.box_size(), header.size);
+
+        let dst_box =
+            Hev1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

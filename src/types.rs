@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 
+use crate::encryption::sample_encryption::SampleEncryption;
 use crate::mp4box::*;
 use crate::opus::ChannelMappingFamily;
 use crate::*;
@@ -235,6 +236,20 @@ pub enum MediaType {
     AAC,
     OPUS,
     TTXT,
+}
+
+impl MediaType {
+    pub fn to_four_cc_format(&self) -> FourCC {
+        match self {
+            MediaType::H264 => FourCC::from(BoxType::Avc1Box),
+            MediaType::H265 => FourCC::from(BoxType::Hev1Box),
+            MediaType::AV1 => FourCC::from(BoxType::Av01Box),
+            MediaType::VP9 => FourCC::from(BoxType::Vp09Box),
+            MediaType::AAC => FourCC::from(BoxType::Mp4aBox),
+            MediaType::OPUS => FourCC::from(BoxType::OpusBox),
+            MediaType::TTXT => FourCC::from(BoxType::Tx3gBox),
+        }
+    }
 }
 
 impl fmt::Display for MediaType {
@@ -691,6 +706,8 @@ pub struct Mp4Sample {
     pub rendering_offset: i32,
     pub is_sync: bool,
     pub bytes: Bytes,
+
+    pub encryption: Option<SampleEncryption>,
 }
 
 impl PartialEq for Mp4Sample {

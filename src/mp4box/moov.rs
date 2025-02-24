@@ -1,5 +1,7 @@
+use pssh::PsshBox;
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::meta::MetaBox;
 use crate::mp4box::*;
@@ -20,6 +22,8 @@ pub struct MoovBox {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub udta: Option<UdtaBox>,
+
+    pub pssh: Vec<PsshBox>,
 }
 
 impl MoovBox {
@@ -41,6 +45,8 @@ impl MoovBox {
         if let Some(udta) = &self.udta {
             size += udta.box_size();
         }
+
+        size += self.pssh.iter().map(|pssh| pssh.box_size()).sum::<u64>();
 
         size
     }
@@ -66,13 +72,14 @@ impl Mp4Box for MoovBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for MoovBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut mvhd = None;
         let mut meta = None;
         let mut udta = None;
         let mut mvex = None;
+        let mut pssh = Vec::new();
         let mut traks = Vec::new();
 
         let mut current = reader.stream_position()?;
@@ -89,23 +96,26 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoovBox {
 
             match name {
                 BoxType::MvhdBox => {
-                    mvhd = Some(MvhdBox::read_box(reader, s)?);
+                    mvhd = Some(MvhdBox::read_box(reader, s, context)?);
                 }
                 BoxType::MetaBox => {
-                    meta = Some(MetaBox::read_box(reader, s)?);
+                    meta = Some(MetaBox::read_box(reader, s, context)?);
                 }
                 BoxType::MvexBox => {
-                    mvex = Some(MvexBox::read_box(reader, s)?);
+                    mvex = Some(MvexBox::read_box(reader, s, context)?);
                 }
                 BoxType::TrakBox => {
-                    let trak = TrakBox::read_box(reader, s)?;
+                    let trak = TrakBox::read_box(reader, s, context)?;
                     traks.push(trak);
                 }
                 BoxType::UdtaBox => {
-                    udta = Some(UdtaBox::read_box(reader, s)?);
+                    udta = Some(UdtaBox::read_box(reader, s, context)?);
+                }
+                BoxType::PsshBox => {
+                    pssh.push(PsshBox::read_box(reader, s, context)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }
@@ -124,6 +134,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for MoovBox {
             meta,
             udta,
             mvex,
+            pssh,
             traks,
         })
     }
@@ -147,6 +158,10 @@ impl<W: Write> WriteBox<&mut W> for MoovBox {
         if let Some(udta) = &self.udta {
             udta.write_box(writer)?;
         }
+        for pssh in self.pssh.iter() {
+            pssh.write_box(writer)?;
+        }
+
         Ok(0)
     }
 }
@@ -165,6 +180,7 @@ mod tests {
             traks: vec![],
             meta: Some(MetaBox::default()),
             udta: Some(UdtaBox::default()),
+            pssh: vec![PsshBox::default()],
         };
 
         let mut buf = Vec::new();
@@ -176,7 +192,7 @@ mod tests {
         assert_eq!(header.name, BoxType::MoovBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MoovBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = MoovBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 
@@ -193,7 +209,7 @@ mod tests {
         assert_eq!(header.name, BoxType::MoovBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MoovBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = MoovBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 }

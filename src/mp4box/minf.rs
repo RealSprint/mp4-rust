@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::mp4box::*;
 use crate::mp4box::{dinf::DinfBox, smhd::SmhdBox, stbl::StblBox, vmhd::VmhdBox};
@@ -55,7 +56,7 @@ impl Mp4Box for MinfBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for MinfBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut vmhd = None;
@@ -77,19 +78,19 @@ impl<R: Read + Seek> ReadBox<&mut R> for MinfBox {
 
             match name {
                 BoxType::VmhdBox => {
-                    vmhd = Some(VmhdBox::read_box(reader, s)?);
+                    vmhd = Some(VmhdBox::read_box(reader, s, context)?);
                 }
                 BoxType::SmhdBox => {
-                    smhd = Some(SmhdBox::read_box(reader, s)?);
+                    smhd = Some(SmhdBox::read_box(reader, s, context)?);
                 }
                 BoxType::DinfBox => {
-                    dinf = Some(DinfBox::read_box(reader, s)?);
+                    dinf = Some(DinfBox::read_box(reader, s, context)?);
                 }
                 BoxType::StblBox => {
-                    stbl = Some(StblBox::read_box(reader, s)?);
+                    stbl = Some(StblBox::read_box(reader, s, context)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

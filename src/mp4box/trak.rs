@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::meta::MetaBox;
 use crate::mp4box::*;
@@ -54,7 +55,7 @@ impl Mp4Box for TrakBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for TrakBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut tkhd = None;
@@ -76,19 +77,19 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrakBox {
 
             match name {
                 BoxType::TkhdBox => {
-                    tkhd = Some(TkhdBox::read_box(reader, s)?);
+                    tkhd = Some(TkhdBox::read_box(reader, s, context)?);
                 }
                 BoxType::EdtsBox => {
-                    edts = Some(EdtsBox::read_box(reader, s)?);
+                    edts = Some(EdtsBox::read_box(reader, s, context)?);
                 }
                 BoxType::MetaBox => {
-                    meta = Some(MetaBox::read_box(reader, s)?);
+                    meta = Some(MetaBox::read_box(reader, s, context)?);
                 }
                 BoxType::MdiaBox => {
-                    mdia = Some(MdiaBox::read_box(reader, s)?);
+                    mdia = Some(MdiaBox::read_box(reader, s, context)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

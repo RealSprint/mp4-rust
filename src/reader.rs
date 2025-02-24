@@ -3,6 +3,7 @@ use std::io::{Read, Seek};
 use std::time::Duration;
 
 use prft::PrftBox;
+use tracing::debug;
 
 use crate::meta::MetaBox;
 use crate::*;
@@ -18,6 +19,7 @@ pub struct Mp4Reader<R> {
 
     tracks: HashMap<u32, Mp4Track>,
     size: u64,
+    context: Mp4Context,
 }
 
 impl<R: Read + Seek> Mp4Reader<R> {
@@ -30,6 +32,8 @@ impl<R: Read + Seek> Mp4Reader<R> {
         let mut prfts = Vec::new();
         let mut moof_offsets = Vec::new();
         let mut emsgs = Vec::new();
+        let mut context = Mp4Context::default();
+        let mut tracks = HashMap::new();
 
         let mut current = start;
         while current < size {
@@ -50,7 +54,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
             // Match and parse the atom boxes.
             match name {
                 BoxType::FtypBox => {
-                    ftyp = Some(FtypBox::read_box(&mut reader, s)?);
+                    ftyp = Some(FtypBox::read_box(&mut reader, s, &mut context)?);
                 }
                 BoxType::FreeBox => {
                     skip_box(&mut reader, s)?;
@@ -59,24 +63,38 @@ impl<R: Read + Seek> Mp4Reader<R> {
                     skip_box(&mut reader, s)?;
                 }
                 BoxType::MoovBox => {
-                    moov = Some(MoovBox::read_box(&mut reader, s)?);
+                    moov = Some(MoovBox::read_box(&mut reader, s, &mut context)?);
+
+                    if let Some(ref moov) = moov {
+                        if moov.traks.iter().any(|trak| trak.tkhd.track_id == 0) {
+                            return Err(Error::InvalidData("illegal track id 0"));
+                        }
+
+                        tracks = moov
+                            .traks
+                            .iter()
+                            .map(|trak| (trak.tkhd.track_id, Mp4Track::from(trak)))
+                            .collect()
+                    }
+
+                    context.iv_sizes = find_iv_size(&tracks);
                 }
                 BoxType::MoofBox => {
                     let moof_offset = reader.stream_position()? - 8;
-                    let moof = MoofBox::read_box(&mut reader, s)?;
+                    let moof = MoofBox::read_box(&mut reader, s, &mut context)?;
                     moofs.push(moof);
                     moof_offsets.push(moof_offset);
                 }
                 BoxType::EmsgBox => {
-                    let emsg = EmsgBox::read_box(&mut reader, s)?;
+                    let emsg = EmsgBox::read_box(&mut reader, s, &mut context)?;
                     emsgs.push(emsg);
                 }
                 BoxType::PrftBox => {
-                    let emsg = PrftBox::read_box(&mut reader, s)?;
+                    let emsg = PrftBox::read_box(&mut reader, s, &mut context)?;
                     prfts.push(emsg);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(&mut reader, s)?;
                 }
             }
@@ -91,17 +109,6 @@ impl<R: Read + Seek> Mp4Reader<R> {
         }
 
         let size = current - start;
-        let mut tracks = if let Some(ref moov) = moov {
-            if moov.traks.iter().any(|trak| trak.tkhd.track_id == 0) {
-                return Err(Error::InvalidData("illegal track id 0"));
-            }
-            moov.traks
-                .iter()
-                .map(|trak| (trak.tkhd.track_id, Mp4Track::from(trak)))
-                .collect()
-        } else {
-            HashMap::new()
-        };
 
         // Update tracks if any fragmented (moof) boxes are found.
         if !moofs.is_empty() {
@@ -122,7 +129,10 @@ impl<R: Read + Seek> Mp4Reader<R> {
                     if let Some(track) = tracks.get_mut(&track_id) {
                         track.default_sample_duration = default_sample_duration;
                         track.moof_offsets.push(moof_offset);
-                        track.trafs.push(traf.clone())
+                        track.trafs.push(traf.clone());
+                        if let Some(senc) = traf.senc.as_ref() {
+                            track.add_encryption_data(senc.sample_encryption.clone());
+                        }
                     } else {
                         return Err(Error::TrakNotFound(track_id));
                     }
@@ -139,6 +149,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
             prfts,
             size,
             tracks,
+            context,
         })
     }
 
@@ -153,6 +164,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
         let mut prfts = Vec::new();
         let mut moof_offsets = Vec::new();
         let mut emsgs = Vec::new();
+        let mut context = self.context.clone();
 
         let mut current = start;
         while current < size {
@@ -176,21 +188,21 @@ impl<R: Read + Seek> Mp4Reader<R> {
                     skip_box(&mut reader, s)?;
                 }
                 BoxType::EmsgBox => {
-                    let emsg = EmsgBox::read_box(&mut reader, s)?;
+                    let emsg = EmsgBox::read_box(&mut reader, s, &mut context)?;
                     emsgs.push(emsg);
                 }
                 BoxType::PrftBox => {
-                    let prft = PrftBox::read_box(&mut reader, s)?;
+                    let prft = PrftBox::read_box(&mut reader, s, &mut context)?;
                     prfts.push(prft);
                 }
                 BoxType::MoofBox => {
                     let moof_offset = reader.stream_position()? - 8;
-                    let moof = MoofBox::read_box(&mut reader, s)?;
+                    let moof = MoofBox::read_box(&mut reader, s, &mut context)?;
                     moofs.push(moof);
                     moof_offsets.push(moof_offset);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(&mut reader, s)?;
                 }
             }
@@ -224,7 +236,11 @@ impl<R: Read + Seek> Mp4Reader<R> {
                 if let Some(track) = tracks.get_mut(&track_id) {
                     track.default_sample_duration = *default_sample_duration;
                     track.moof_offsets.push(moof_offset);
-                    track.trafs.push(traf.clone())
+                    track.trafs.push(traf.clone());
+
+                    if let Some(senc) = traf.senc.as_ref() {
+                        track.add_encryption_data(senc.sample_encryption.clone());
+                    }
                 } else {
                     return Err(Error::TrakNotFound(track_id));
                 }
@@ -240,6 +256,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
             prfts,
             tracks,
             size,
+            context,
         })
     }
 
@@ -284,7 +301,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
     }
 
     pub fn read_sample(&mut self, track_id: u32, sample_id: u32) -> Result<Option<Mp4Sample>> {
-        if let Some(track) = self.tracks.get(&track_id) {
+        if let Some(track) = self.tracks.get_mut(&track_id) {
             track.read_sample(&mut self.reader, sample_id)
         } else {
             Err(Error::TrakNotFound(track_id))
@@ -309,4 +326,23 @@ impl<R> Mp4Reader<R> {
             })
         })
     }
+}
+
+fn find_iv_size(tracks: &HashMap<u32, Mp4Track>) -> HashMap<u32, u8> {
+    // Note: This value could also be read from saiz if not present in tenc.
+    tracks
+        .iter()
+        .filter_map(|(track_id, track)| {
+            // Should be fine to just get the value from a single sinf box, as the iv size needs to be the same for all samples.
+            let iv_size = track.get_sinf().and_then(|sinf| {
+                sinf.iter().find_map(|sinf| {
+                    sinf.schi
+                        .as_ref()
+                        .map(|schi| schi.tenc.default_per_sample_iv_size)
+                })
+            });
+
+            Some((*track_id, iv_size?))
+        })
+        .collect()
 }

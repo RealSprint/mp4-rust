@@ -1,6 +1,8 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
+use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::mp4box::*;
 
@@ -13,6 +15,8 @@ pub struct Mp4aBox {
     #[serde(with = "value_u32")]
     pub samplerate: FixedPointU16,
     pub esds: Option<EsdsBox>,
+
+    pub sinf: Vec<SinfBox>,
 }
 
 impl Default for Mp4aBox {
@@ -23,6 +27,7 @@ impl Default for Mp4aBox {
             samplesize: 16,
             samplerate: FixedPointU16::new(48000),
             esds: Some(EsdsBox::default()),
+            sinf: Vec::new(),
         }
     }
 }
@@ -35,11 +40,19 @@ impl Mp4aBox {
             samplesize: 16,
             samplerate: FixedPointU16::new(config.freq_index.freq() as u16),
             esds: Some(EsdsBox::new(config)),
+            sinf: Vec::new(),
         }
     }
 
+    pub fn is_encrypted(&self) -> bool {
+        !self.sinf.is_empty()
+    }
+
     pub fn get_type(&self) -> BoxType {
-        BoxType::Mp4aBox
+        match self.is_encrypted() {
+            true => BoxType::EncaBox,
+            false => BoxType::Mp4aBox,
+        }
     }
 
     pub fn get_size(&self) -> u64 {
@@ -47,6 +60,9 @@ impl Mp4aBox {
         if let Some(ref esds) = self.esds {
             size += esds.box_size();
         }
+
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
+
         size
     }
 }
@@ -76,7 +92,7 @@ impl Mp4Box for Mp4aBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         reader.read_u32::<BigEndian>()?; // reserved
@@ -96,14 +112,12 @@ impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
             reader.read_u64::<BigEndian>()?;
         }
 
-        // Find esds in mp4a or wave
         let mut esds = None;
+        let mut sinf = Vec::new();
+
+        let mut current = reader.stream_position()?;
         let end = start + size;
-        loop {
-            let current = reader.stream_position()?;
-            if current >= end {
-                break;
-            }
+        while current < end {
             let header = BoxHeader::read(reader)?;
             let BoxHeader { name, size: s } = header;
             if s > size {
@@ -111,16 +125,20 @@ impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
                     "mp4a box contains a box with a larger size than it",
                 ));
             }
-            if name == BoxType::EsdsBox {
-                esds = Some(EsdsBox::read_box(reader, s)?);
-                break;
-            } else if name == BoxType::WaveBox {
-                // Typically contains frma, mp4a, esds, and a terminator atom
-            } else {
-                // Skip boxes
-                let skip_to = current + s;
-                skip_bytes_to(reader, skip_to)?;
+
+            match name {
+                BoxType::EsdsBox => {
+                    esds = Some(EsdsBox::read_box(reader, s, context)?);
+                }
+                BoxType::SinfBox => {
+                    sinf.push(SinfBox::read_box(reader, s, context)?);
+                }
+                _ => {
+                    debug!("Skipping box: {:?}", name);
+                    skip_box(reader, s)?;
+                }
             }
+            current = reader.stream_position()?;
         }
 
         skip_bytes_to(reader, end)?;
@@ -131,6 +149,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Mp4aBox {
             samplesize,
             samplerate,
             esds,
+            sinf,
         })
     }
 }
@@ -152,6 +171,10 @@ impl<W: Write> WriteBox<&mut W> for Mp4aBox {
 
         if let Some(ref esds) = self.esds {
             esds.write_box(writer)?;
+        }
+
+        for sinf in &self.sinf {
+            sinf.write_box(writer)?;
         }
 
         Ok(size)
@@ -198,7 +221,7 @@ impl Mp4Box for EsdsBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for EsdsBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let (version, flags) = read_box_header_ext(reader)?;
@@ -645,6 +668,7 @@ mod tests {
                     sl_config: SLConfigDescriptor::default(),
                 },
             }),
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -655,7 +679,7 @@ mod tests {
         assert_eq!(header.name, BoxType::Mp4aBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Mp4aBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Mp4aBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -667,6 +691,7 @@ mod tests {
             samplesize: 16,
             samplerate: FixedPointU16::new(48000),
             esds: None,
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -677,7 +702,30 @@ mod tests {
         assert_eq!(header.name, BoxType::Mp4aBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Mp4aBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Mp4aBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_mp4a_sinf() {
+        let src_box = Mp4aBox {
+            data_reference_index: 1,
+            channelcount: 2,
+            samplesize: 16,
+            samplerate: FixedPointU16::new(48000),
+            esds: None,
+            sinf: vec![SinfBox::default()],
+        };
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+        assert_eq!(buf.len(), src_box.box_size() as usize);
+
+        let mut reader = Cursor::new(&buf);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::EncaBox);
+        assert_eq!(src_box.box_size(), header.size);
+
+        let dst_box = Mp4aBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

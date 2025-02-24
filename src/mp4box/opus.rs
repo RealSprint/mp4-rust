@@ -1,6 +1,8 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
+use sinf::SinfBox;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::mp4box::*;
 
@@ -12,6 +14,8 @@ pub struct OpusBox {
     #[serde(with = "value_u32")]
     pub samplerate: FixedPointU16,
     pub dops: DopsBox,
+
+    pub sinf: Vec<SinfBox>,
 }
 
 impl OpusBox {
@@ -27,16 +31,26 @@ impl OpusBox {
                 output_gain: config.output_gain,
                 channel_mapping_family: config.channel_mapping_family.clone(),
             },
+            sinf: Vec::new(),
         }
     }
 
+    pub fn is_encrypted(&self) -> bool {
+        !self.sinf.is_empty()
+    }
+
     pub fn get_type(&self) -> BoxType {
-        BoxType::OpusBox
+        match self.is_encrypted() {
+            true => BoxType::EncaBox,
+            false => BoxType::OpusBox,
+        }
     }
 
     pub fn get_size(&self) -> u64 {
         let mut size = HEADER_SIZE + 8 + 20;
         size += self.dops.box_size();
+
+        size += self.sinf.iter().map(|sinf| sinf.box_size()).sum::<u64>();
 
         size
     }
@@ -67,7 +81,7 @@ impl Mp4Box for OpusBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for OpusBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         reader.read_u32::<BigEndian>()?; // reserved
@@ -87,27 +101,48 @@ impl<R: Read + Seek> ReadBox<&mut R> for OpusBox {
             reader.read_u64::<BigEndian>()?;
         }
 
-        let header = BoxHeader::read(reader)?;
-        let BoxHeader { name, size: s } = header;
-        if s > size {
-            return Err(Error::InvalidData(
-                "opus box contains a box with a larger size than it",
-            ));
-        }
-        if name == BoxType::DopsBox {
-            let dops = DopsBox::read_box(reader, s)?;
+        let mut dops = None;
+        let mut sinf = Vec::new();
 
-            skip_bytes_to(reader, start + size)?;
+        let mut current = reader.stream_position()?;
+        let end = start + size;
+        while current < end {
+            let header = BoxHeader::read(reader)?;
+            let BoxHeader { name, size: s } = header;
+            if s > size {
+                return Err(Error::InvalidData(
+                    "opus box contains a box with a larger size than it",
+                ));
+            }
 
-            Ok(OpusBox {
-                data_reference_index,
-                samplesize,
-                samplerate,
-                dops,
-            })
-        } else {
-            Err(Error::InvalidData("dops not found"))
+            match name {
+                BoxType::DopsBox => {
+                    dops = Some(DopsBox::read_box(reader, s, context)?);
+                }
+                BoxType::SinfBox => {
+                    sinf.push(SinfBox::read_box(reader, s, context)?);
+                }
+                _ => {
+                    debug!("Skipping box: {:?}", name);
+                    skip_box(reader, s)?;
+                }
+            }
+            current = reader.stream_position()?;
         }
+
+        let Some(dops) = dops else {
+            return Err(Error::InvalidData("dops not found"));
+        };
+
+        skip_bytes_to(reader, start + size)?;
+
+        Ok(OpusBox {
+            data_reference_index,
+            samplesize,
+            samplerate,
+            dops,
+            sinf,
+        })
     }
 }
 
@@ -127,6 +162,10 @@ impl<W: Write> WriteBox<&mut W> for OpusBox {
         writer.write_u32::<BigEndian>(self.samplerate.raw_value())?;
 
         self.dops.write_box(writer)?;
+
+        for sinf in &self.sinf {
+            sinf.write_box(writer)?;
+        }
 
         Ok(size)
     }
@@ -264,7 +303,7 @@ impl Mp4Box for DopsBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for DopsBox {
-    fn read_box(reader: &mut R, _size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, _size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let _start = box_start(reader)?;
         let version = reader.read_u8()?;
         let output_channel_count = reader.read_u8()?;
@@ -316,7 +355,7 @@ mod tests {
     use std::io::Cursor;
 
     #[test]
-    fn test_mp4a() {
+    fn test_opus() {
         let src_box = OpusBox {
             data_reference_index: 1,
             samplesize: 16,
@@ -328,6 +367,7 @@ mod tests {
                 output_gain: 3,
                 channel_mapping_family: ChannelMappingFamily::Family0 { stereo: true },
             },
+            sinf: Vec::new(),
         };
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -338,7 +378,37 @@ mod tests {
         assert_eq!(header.name, BoxType::OpusBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = OpusBox::read_box(&mut reader, header.size).unwrap();
+        let dst_box =
+            OpusBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_opus_with_sinf() {
+        let src_box = OpusBox {
+            data_reference_index: 1,
+            samplesize: 16,
+            samplerate: FixedPointU16::new(48000),
+            dops: DopsBox {
+                version: 0,
+                pre_skip: 1,
+                input_sample_rate: 2,
+                output_gain: 3,
+                channel_mapping_family: ChannelMappingFamily::Family0 { stereo: true },
+            },
+            sinf: vec![SinfBox::default()],
+        };
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+        assert_eq!(buf.len(), src_box.box_size() as usize);
+
+        let mut reader = Cursor::new(&buf);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::EncaBox);
+        assert_eq!(src_box.box_size(), header.size);
+
+        let dst_box =
+            OpusBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

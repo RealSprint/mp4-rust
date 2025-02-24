@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::io::{Read, Seek, Write};
+use tracing::debug;
 
 use crate::mp4box::*;
 use crate::mp4box::{mehd::MehdBox, trex::TrexBox};
@@ -41,7 +42,7 @@ impl Mp4Box for MvexBox {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for MvexBox {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
 
         let mut mehd = None;
@@ -61,13 +62,13 @@ impl<R: Read + Seek> ReadBox<&mut R> for MvexBox {
 
             match name {
                 BoxType::MehdBox => {
-                    mehd = Some(MehdBox::read_box(reader, s)?);
+                    mehd = Some(MehdBox::read_box(reader, s, context)?);
                 }
                 BoxType::TrexBox => {
-                    trex.push(TrexBox::read_box(reader, s)?);
+                    trex.push(TrexBox::read_box(reader, s, context)?);
                 }
                 _ => {
-                    // XXX warn!()
+                    debug!("Skipping box: {:?}", name);
                     skip_box(reader, s)?;
                 }
             }

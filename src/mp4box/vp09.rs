@@ -84,7 +84,7 @@ impl Mp4Box for Vp09Box {
 }
 
 impl<R: Read + Seek> ReadBox<&mut R> for Vp09Box {
-    fn read_box(reader: &mut R, size: u64) -> Result<Self> {
+    fn read_box(reader: &mut R, size: u64, context: &mut Mp4Context) -> Result<Self> {
         let start = box_start(reader)?;
         let (version, flags) = read_box_header_ext(reader)?;
 
@@ -126,7 +126,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for Vp09Box {
                     "vp09 box contains a box with a larger size than it",
                 ));
             }
-            VpccBox::read_box(reader, header.size)?
+            VpccBox::read_box(reader, header.size, context)?
         };
 
         skip_bytes_to(reader, start + size)?;
@@ -199,7 +199,7 @@ mod tests {
         assert_eq!(header.name, BoxType::Vp09Box);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Vp09Box::read_box(&mut reader, header.size).unwrap();
+        let dst_box = Vp09Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }
