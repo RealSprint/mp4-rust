@@ -1,5 +1,6 @@
-use std::io::{Read, Seek, Write};
+use std::io::{Cursor, Read, Seek, Write};
 
+use base64::{prelude::BASE64_STANDARD, Engine};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
@@ -24,6 +25,23 @@ pub struct PsshBox {
 }
 
 impl PsshBox {
+    pub fn from_base64(base64: &str) -> Result<Self> {
+        let data = BASE64_STANDARD.decode(base64.as_bytes())?;
+
+        let mut reader = Cursor::new(&data);
+        let header = BoxHeader::read(&mut reader)?;
+
+        PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default())
+    }
+
+    pub fn new_clearkey() -> Self {
+        let system_id = [
+            0x10, 0x77, 0xef, 0xec, 0xc0, 0xb2, 0x4d, 0x02, //
+            0xac, 0xe3, 0x3c, 0x1e, 0x52, 0xe2, 0xfb, 0x4b, //
+        ];
+        Self::new(system_id, vec![])
+    }
+
     pub fn new(system_id: [u8; 16], data: Vec<u8>) -> Self {
         PsshBox {
             version: 0,
@@ -250,5 +268,40 @@ mod tests {
         let dst_box =
             PsshBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn widevine() {
+        let base64 =
+            "AAAAP3Bzc2gAAAAA7e+LqXnWSs6jyCfc1R0h7QAAAB8SEKIFDqR9T0FWsI36mib6TasaBWV6ZHJtSPPGiZsG";
+
+        let pssh = PsshBox::from_base64(base64).unwrap();
+
+        assert_eq!(
+            pssh.system_id,
+            [
+                0xed, 0xef, 0x8b, 0xa9, 0x79, 0xd6, 0x4a, 0xce, //
+                0xa3, 0xc8, 0x27, 0xdc, 0xd5, 0x1d, 0x21, 0xed //
+            ]
+        );
+
+        assert_eq!(pssh.data_size, 31)
+    }
+
+    #[test]
+    fn playready() {
+        let base64 = "AAACvnBzc2gAAAAAmgTweZhAQoarkuZb4IhflQAAAp6eAgAAAQABAJQCPABXAFIATQBIAEUAQQBEAEUAUgAgAHgAbQBsAG4AcwA9ACIAaAB0AHQAcAA6AC8ALwBzAGMAaABlAG0AYQBzAC4AbQBpAGMAcgBvAHMAbwBmAHQALgBjAG8AbQAvAEQAUgBNAC8AMgAwADAANwAvADAAMwAvAFAAbABhAHkAUgBlAGEAZAB5AEgAZQBhAGQAZQByACIAIAB2AGUAcgBzAGkAbwBuAD0AIgA0AC4AMwAuADAALgAwACIAPgA8AEQAQQBUAEEAPgA8AFAAUgBPAFQARQBDAFQASQBOAEYATwA+ADwASwBJAEQAUwA+ADwASwBJAEQAIABBAEwARwBJAEQAPQAiAEEARQBTAEMAQgBDACIAIABWAEEATABVAEUAPQAiAHAAQQA0AEYAbwBrADkAOQBWAGsARwB3AGoAZgBxAGEASgB2AHAATgBxAGcAPQA9ACIAPgA8AC8ASwBJAEQAPgA8AC8ASwBJAEQAUwA+ADwALwBQAFIATwBUAEUAQwBUAEkATgBGAE8APgA8AEwAQQBfAFUAUgBMAD4AaAB0AHQAcABzADoALwAvAHAAbABhAHkAcgBlAGEAZAB5AC4AZQB6AGQAcgBtAC4AYwBvAG0ALwBjAGUAbgBjAHkALwBwAHIAZQBhAHUAdABoAC4AYQBzAHAAeAA/AHAAWAA9AEYANgAxADQARAAxADwALwBMAEEAXwBVAFIATAA+ADwARABTAF8ASQBEAD4AVgBsAFIANwBJAGQAcwBJAEoARQB1AFIAZAAwADYATABhAHEAcwAyAGoAdwA9AD0APAAvAEQAUwBfAEkARAA+ADwALwBEAEEAVABBAD4APAAvAFcAUgBNAEgARQBBAEQARQBSAD4A";
+
+        let pssh = PsshBox::from_base64(base64).unwrap();
+
+        assert_eq!(
+            pssh.system_id,
+            [
+                0x9a, 0x04, 0xf0, 0x79, 0x98, 0x40, 0x42, 0x86, //
+                0xab, 0x92, 0xe6, 0x5b, 0xe0, 0x88, 0x5f, 0x95 //
+            ]
+        );
+
+        assert_eq!(pssh.data_size, 670)
     }
 }
