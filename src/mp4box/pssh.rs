@@ -90,11 +90,11 @@ impl PsshBox {
         HEADER_SIZE + HEADER_EXT_SIZE + 16 + kid_size + data_size
     }
 
-    pub fn to_base64(&self) -> String {
+    pub fn to_base64(&self) -> Result<String> {
         let mut buf = Vec::new();
-        self.write_box(&mut buf).unwrap();
+        self.write_box(&mut buf)?;
 
-        BASE64_STANDARD.encode(&buf)
+        Ok(BASE64_STANDARD.encode(&buf))
     }
 }
 
@@ -196,7 +196,8 @@ impl Serialize for PsshBox {
     where
         S: serde::Serializer,
     {
-        serializer.collect_str(&self.to_base64())
+        let base64 = self.to_base64().map_err(serde::ser::Error::custom)?;
+        serializer.collect_str(&base64)
     }
 }
 
