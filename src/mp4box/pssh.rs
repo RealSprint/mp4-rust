@@ -4,24 +4,32 @@ use base64::{prelude::BASE64_STANDARD, Engine};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
+use crate::encryption::drm_key::DrmKey;
+
 use super::{
     box_start, skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, Mp4Context,
     ReadBox, Result, WriteBox, HEADER_EXT_SIZE, HEADER_SIZE,
 };
 
 // ISO 23001-7:2023 - 8.1 Protection System Specific Header Box
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct PsshBox {
     version: u8,
     flags: u32,
 
-    system_id: [u8; 16],
+    system_id: DrmKey,
 
     kid_count: Option<u32>,
-    kid: Vec<[u8; 16]>,
+    kid: Vec<DrmKey>,
 
     data_size: u32,
     data: Vec<u8>,
+}
+
+impl Default for PsshBox {
+    fn default() -> Self {
+        Self::new_clearkey()
+    }
 }
 
 impl PsshBox {
@@ -35,14 +43,13 @@ impl PsshBox {
     }
 
     pub fn new_clearkey() -> Self {
-        let system_id = [
-            0x10, 0x77, 0xef, 0xec, 0xc0, 0xb2, 0x4d, 0x02, //
-            0xac, 0xe3, 0x3c, 0x1e, 0x52, 0xe2, 0xfb, 0x4b, //
-        ];
-        Self::new(system_id, vec![])
+        Self::new(
+            DrmKey::from_hex("1077efecc0b24d02ace33c1e52e2fb4b").expect("always valid"),
+            vec![],
+        )
     }
 
-    pub fn new(system_id: [u8; 16], data: Vec<u8>) -> Self {
+    pub fn new(system_id: DrmKey, data: Vec<u8>) -> Self {
         PsshBox {
             version: 0,
             flags: 0,
@@ -57,7 +64,7 @@ impl PsshBox {
         }
     }
 
-    pub fn with_kid(system_id: [u8; 16], kid: Vec<[u8; 16]>, data: Vec<u8>) -> Self {
+    pub fn with_kid(system_id: DrmKey, kid: Vec<DrmKey>, data: Vec<u8>) -> Self {
         PsshBox {
             version: 1,
             flags: 0,
@@ -70,14 +77,6 @@ impl PsshBox {
             data_size: data.len() as u32,
             data,
         }
-    }
-
-    pub fn get_kid(&self) -> &Vec<[u8; 16]> {
-        &self.kid
-    }
-
-    pub fn get_system_id(&self) -> &[u8; 16] {
-        &self.system_id
     }
 
     pub fn get_type(&self) -> BoxType {
@@ -135,7 +134,10 @@ impl<R: Read + Seek> ReadBox<&mut R> for PsshBox {
             for i in 0..kid_count {
                 reader.read_exact(&mut kid[i as usize])?;
             }
-            (Some(kid_count), kid)
+            (
+                Some(kid_count),
+                kid.iter().map(|x| DrmKey::new(*x)).collect(),
+            )
         } else {
             (None, Vec::new())
         };
@@ -149,7 +151,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for PsshBox {
         Ok(PsshBox {
             version,
             flags,
-            system_id,
+            system_id: DrmKey::new(system_id),
             kid_count,
             kid,
             data_size,
@@ -166,7 +168,7 @@ impl<W: Write> WriteBox<&mut W> for PsshBox {
 
         write_box_header_ext(writer, self.version, self.flags)?;
 
-        writer.write_all(&self.system_id)?;
+        writer.write_all(self.system_id.data())?;
 
         if self.version > 0 {
             let kid_count = match self.kid_count {
@@ -177,7 +179,7 @@ impl<W: Write> WriteBox<&mut W> for PsshBox {
             writer.write_u32::<BigEndian>(kid_count)?;
 
             for i in 0..kid_count {
-                writer.write_all(&self.kid[i as usize])?;
+                writer.write_all(self.kid[i as usize].data())?;
             }
         }
 
@@ -196,10 +198,10 @@ mod tests {
 
     #[test]
     fn test_pssh() {
-        let system_id = [
+        let system_id = DrmKey::new([
             0x10, 0x77, 0xef, 0xec, 0xc0, 0xb2, 0x4d, 0x02, //
             0xac, 0xe3, 0x3c, 0x1e, 0x52, 0xe2, 0xfb, 0x4b,
-        ];
+        ]);
 
         let data = vec![
             0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
@@ -233,15 +235,15 @@ mod tests {
 
     #[test]
     fn test_pssh_with_kid() {
-        let kid = vec![[
+        let kid = vec![DrmKey::new([
             0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
             0xb8, 0xea, 0xef, 0x6b, 0xbf, 0x58, 0x2d, 0x8e,
-        ]];
+        ])];
 
-        let system_id = [
+        let system_id = DrmKey::new([
             0x10, 0x77, 0xef, 0xec, 0xc0, 0xb2, 0x4d, 0x02, //
             0xac, 0xe3, 0x3c, 0x1e, 0x52, 0xe2, 0xfb, 0x4b,
-        ];
+        ]);
 
         let src_box = PsshBox::with_kid(system_id, kid, Vec::new());
 
@@ -278,8 +280,8 @@ mod tests {
         let pssh = PsshBox::from_base64(base64).unwrap();
 
         assert_eq!(
-            pssh.system_id,
-            [
+            pssh.system_id.data(),
+            &[
                 0xed, 0xef, 0x8b, 0xa9, 0x79, 0xd6, 0x4a, 0xce, //
                 0xa3, 0xc8, 0x27, 0xdc, 0xd5, 0x1d, 0x21, 0xed //
             ]
@@ -295,8 +297,8 @@ mod tests {
         let pssh = PsshBox::from_base64(base64).unwrap();
 
         assert_eq!(
-            pssh.system_id,
-            [
+            pssh.system_id.data(),
+            &[
                 0x9a, 0x04, 0xf0, 0x79, 0x98, 0x40, 0x42, 0x86, //
                 0xab, 0x92, 0xe6, 0x5b, 0xe0, 0x88, 0x5f, 0x95 //
             ]
