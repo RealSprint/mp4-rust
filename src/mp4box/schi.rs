@@ -8,7 +8,7 @@ use super::{
 };
 
 // ISO 14496-12:2022 - 8.12.7 Scheme Information Box
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SchiBox {
     pub tenc: TencBox,
 }
@@ -107,7 +107,8 @@ mod tests {
         assert_eq!(header.name, BoxType::SchiBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = SchiBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            SchiBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

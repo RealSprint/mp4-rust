@@ -180,7 +180,7 @@ mod tests {
             traks: vec![],
             meta: Some(MetaBox::default()),
             udta: Some(UdtaBox::default()),
-            pssh: vec![PsshBox::default()],
+            pssh: vec![PsshBox::new_clearkey()],
         };
 
         let mut buf = Vec::new();
@@ -192,7 +192,8 @@ mod tests {
         assert_eq!(header.name, BoxType::MoovBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MoovBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            MoovBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 
@@ -209,7 +210,8 @@ mod tests {
         assert_eq!(header.name, BoxType::MoovBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = MoovBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            MoovBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 }

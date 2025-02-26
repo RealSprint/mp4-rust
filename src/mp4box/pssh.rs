@@ -26,12 +26,6 @@ pub struct PsshBox {
     data: Vec<u8>,
 }
 
-impl Default for PsshBox {
-    fn default() -> Self {
-        Self::new_clearkey()
-    }
-}
-
 impl PsshBox {
     pub fn from_base64(base64: &str) -> Result<Self> {
         let data = BASE64_STANDARD.decode(base64.as_bytes())?;

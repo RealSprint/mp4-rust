@@ -229,12 +229,6 @@ impl<W: Write> WriteBox<&mut W> for TencBox {
     }
 }
 
-impl Default for TencBox {
-    fn default() -> Self {
-        Self::new_unprotected()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
