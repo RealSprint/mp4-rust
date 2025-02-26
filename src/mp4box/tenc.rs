@@ -3,6 +3,8 @@ use std::io::{Read, Seek, Write};
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use serde::Serialize;
 
+use crate::encryption::drm_key::DrmKey;
+
 use super::{
     box_start, encryption::initialization_vector::InitializationVector, read_box_header_ext,
     skip_bytes_to, write_box_header_ext, BoxHeader, BoxType, Error, Mp4Box, Mp4Context, ReadBox,
@@ -10,7 +12,7 @@ use super::{
 };
 
 // ISO 23001-7:2023 - 8.2 Track Encryption Box
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct TencBox {
     default_crypt_byte_block: Option<u8>,
     default_skip_byte_block: Option<u8>,
@@ -20,7 +22,7 @@ pub struct TencBox {
     // 8: 64-bit IVs
     // 16: 128-bit IVs
     pub(crate) default_per_sample_iv_size: u8,
-    default_kid: [u8; 16],
+    default_kid: DrmKey,
 
     // 8: 64-bit IVs
     // 16: 128-bit IVs
@@ -36,21 +38,24 @@ impl TencBox {
 
             default_is_protected: false,
             default_per_sample_iv_size: 0,
-            default_kid: [0; 16],
+            default_kid: DrmKey::new([0; 16]),
 
             default_constant_iv_size: None,
             default_constant_iv: None,
         }
     }
 
-    pub fn new_kid_protected(iv: InitializationVector) -> Self {
+    pub fn new_per_sample_iv_protected(
+        default_per_sample_iv_size: u8,
+        default_kid: DrmKey,
+    ) -> Self {
         TencBox {
             default_crypt_byte_block: None,
             default_skip_byte_block: None,
 
             default_is_protected: true,
-            default_per_sample_iv_size: iv.size(),
-            default_kid: iv.data(),
+            default_per_sample_iv_size,
+            default_kid,
 
             default_constant_iv_size: None,
             default_constant_iv: None,
@@ -59,7 +64,7 @@ impl TencBox {
 
     pub fn new_constant_iv_protected(
         iv: InitializationVector,
-        default_kid: [u8; 16],
+        default_kid: DrmKey,
         crypt: Option<u8>,
         skip: Option<u8>,
     ) -> Self {
@@ -168,7 +173,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for TencBox {
             default_skip_byte_block,
             default_is_protected,
             default_per_sample_iv_size,
-            default_kid,
+            default_kid: DrmKey::new(default_kid),
             default_constant_iv_size,
             default_constant_iv,
         })
@@ -204,7 +209,7 @@ impl<W: Write> WriteBox<&mut W> for TencBox {
 
         writer.write_u8(self.default_per_sample_iv_size)?;
 
-        writer.write_all(&self.default_kid)?;
+        writer.write_all(self.default_kid.data())?;
 
         if self.default_is_protected && self.default_per_sample_iv_size == 0 {
             match (&self.default_constant_iv_size, &self.default_constant_iv) {
@@ -258,42 +263,12 @@ mod tests {
     }
 
     #[test]
-    fn test_tenc_kid_64() {
-        let data = [
-            0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
-        ];
-        let src_box = TencBox::new_kid_protected(InitializationVector::new_64_bit(data));
-
-        let mut buf = Vec::new();
-        src_box.write_box(&mut buf).unwrap();
-        assert_eq!(buf.len(), src_box.box_size() as usize);
-
-        let expected = vec![
-            0x00, 0x00, 0x00, 0x20, b't', b'e', b'n', b'c', //
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x08, //
-            0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
-        ];
-
-        assert_eq!(buf, expected);
-
-        let mut reader = Cursor::new(&buf);
-        let header = BoxHeader::read(&mut reader).unwrap();
-        assert_eq!(header.name, BoxType::TencBox);
-        assert_eq!(src_box.box_size(), header.size);
-
-        let dst_box =
-            TencBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
-        assert_eq!(src_box, dst_box);
-    }
-
-    #[test]
     fn test_tenc_kid_128() {
         let data = [
             0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, 0x16, //
             0xb8, 0xea, 0xef, 0x6b, 0xbf, 0x58, 0x2d, 0x8e, //
         ];
-        let src_box = TencBox::new_kid_protected(InitializationVector::new_128_bit(data));
+        let src_box = TencBox::new_per_sample_iv_protected(16, DrmKey::new(data));
 
         let mut buf = Vec::new();
         src_box.write_box(&mut buf).unwrap();
@@ -325,7 +300,7 @@ mod tests {
         ];
         let src_box = TencBox::new_constant_iv_protected(
             InitializationVector::new_64_bit(data),
-            [0; 16],
+            DrmKey::new([0; 16]),
             Some(1),
             Some(9),
         );
@@ -363,7 +338,10 @@ mod tests {
         ];
         let src_box = TencBox::new_constant_iv_protected(
             InitializationVector::new_128_bit(data),
-            [0; 16],
+            DrmKey::new([
+                0xae, 0xfb, 0x53, 0xb5, 0xa6, 0x67, 0x4f, 0xc0, //
+                0xb7, 0x7d, 0x47, 0x20, 0xe5, 0xac, 0x87, 0xfb, //
+            ]),
             Some(1),
             Some(9),
         );
@@ -375,8 +353,8 @@ mod tests {
         let expected = vec![
             0x00, 0x00, 0x00, 0x31, b't', b'e', b'n', b'c', //
             0x01, 0x00, 0x00, 0x00, 0x00, 0x19, 0x01, 0x00, //
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
+            0xae, 0xfb, 0x53, 0xb5, 0xa6, 0x67, 0x4f, 0xc0, //
+            0xb7, 0x7d, 0x47, 0x20, 0xe5, 0xac, 0x87, 0xfb, //
             0x10, 0x6d, 0x76, 0xf2, 0x5c, 0xb1, 0x7f, 0x5e, //
             0x16, 0xb8, 0xea, 0xef, 0x6b, 0xbf, 0x58, 0x2d, //
             0x8e,
