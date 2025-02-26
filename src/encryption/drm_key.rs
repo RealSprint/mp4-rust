@@ -1,7 +1,10 @@
-use serde::Serialize;
+use std::{convert::TryFrom, fmt::Display};
+
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Hash)]
+#[serde(try_from = "String")]
 pub struct DrmKey([u8; 16]);
 
 impl DrmKey {
@@ -18,6 +21,34 @@ impl DrmKey {
         hex::decode_to_slice(value, &mut key)?;
 
         Ok(DrmKey(key))
+    }
+}
+
+impl Display for DrmKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        hex::encode(self.data()).fmt(f)
+    }
+}
+
+impl TryFrom<&str> for DrmKey {
+    type Error = DrmKeyError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::from_hex(value)
+    }
+}
+
+impl TryFrom<String> for DrmKey {
+    type Error = DrmKeyError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::from_hex(&value)
+    }
+}
+
+impl Serialize for DrmKey {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(&self)
     }
 }
 

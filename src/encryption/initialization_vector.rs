@@ -1,9 +1,10 @@
-use std::fmt::Display;
+use std::{convert::TryFrom, fmt::Display};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
+#[serde(try_from = "String")]
 pub struct InitializationVector {
     value: u128,
     size: u8,
@@ -22,6 +23,10 @@ impl InitializationVector {
             value: u128::from_be_bytes(data),
             size: 16,
         }
+    }
+
+    pub fn from_hex(data: &str) -> Result<Self, InitializationVectorError> {
+        Self::new(hex::decode(data)?)
     }
 
     pub fn new(data: Vec<u8>) -> Result<Self, InitializationVectorError> {
@@ -79,11 +84,29 @@ impl InitializationVector {
 
 impl Display for InitializationVector {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for b in self.data() {
-            write!(f, "{:02x}", b)?;
-        }
+        hex::encode(self.data()).fmt(f)
+    }
+}
 
-        Ok(())
+impl Serialize for InitializationVector {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(&self)
+    }
+}
+
+impl TryFrom<&str> for InitializationVector {
+    type Error = InitializationVectorError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::from_hex(value)
+    }
+}
+
+impl TryFrom<String> for InitializationVector {
+    type Error = InitializationVectorError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::from_hex(&value)
     }
 }
 
@@ -91,6 +114,8 @@ impl Display for InitializationVector {
 pub enum InitializationVectorError {
     #[error("Invalid size: {0}")]
     InvalidSize(u8),
+    #[error(transparent)]
+    InvalidKey(#[from] hex::FromHexError),
 }
 
 #[cfg(test)]
