@@ -2,7 +2,7 @@ use std::io::{Cursor, Read, Seek, Write};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use serde::Serialize;
+use serde::{de, Serialize};
 
 use crate::encryption::drm_key::DrmKey;
 
@@ -12,7 +12,7 @@ use super::{
 };
 
 // ISO 23001-7:2023 - 8.1 Protection System Specific Header Box
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PsshBox {
     version: u8,
     flags: u32,
@@ -88,6 +88,13 @@ impl PsshBox {
         let data_size = 4 + self.data_size as u64;
 
         HEADER_SIZE + HEADER_EXT_SIZE + 16 + kid_size + data_size
+    }
+
+    pub fn to_base64(&self) -> String {
+        let mut buf = Vec::new();
+        self.write_box(&mut buf).unwrap();
+
+        BASE64_STANDARD.encode(&buf)
     }
 }
 
@@ -181,6 +188,25 @@ impl<W: Write> WriteBox<&mut W> for PsshBox {
         writer.write_all(&self.data)?;
 
         Ok(size)
+    }
+}
+
+impl Serialize for PsshBox {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(&self.to_base64())
+    }
+}
+
+impl<'de> de::Deserialize<'de> for PsshBox {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_base64(&s).map_err(|err| <D::Error as serde::de::Error>::custom(err.to_string()))
     }
 }
 
