@@ -14,7 +14,6 @@ pub struct SaizBox {
     aux_info_type: Option<u32>,
     aux_info_type_parameter: Option<u32>,
     default_sample_info_size: u8,
-    sample_count: u32,
     sample_info_sizes: Vec<u8>,
 }
 
@@ -24,13 +23,12 @@ impl SaizBox {
             aux_info_type: None,
             aux_info_type_parameter: None,
             default_sample_info_size,
-            sample_count: 0,
             sample_info_sizes: vec![],
         }
     }
 
-    pub fn increment_sample_count(&mut self) {
-        self.sample_count += 1;
+    pub fn add_sample_info_size(&mut self, size: u8) {
+        self.sample_info_sizes.push(size);
     }
 
     pub fn get_type(&self) -> BoxType {
@@ -38,13 +36,19 @@ impl SaizBox {
     }
 
     pub fn get_size(&self) -> u64 {
-        let mut size = HEADER_SIZE + HEADER_EXT_SIZE + 1 + 4;
+        let mut size = HEADER_SIZE + HEADER_EXT_SIZE;
         if let (Some(_), Some(_)) = (self.aux_info_type, self.aux_info_type_parameter) {
             size += 8
         }
 
+        // default_sample_info_size
+        size += 1;
+
+        // sample_count
+        size += 4;
+
         if self.default_sample_info_size == 0 {
-            size += self.sample_count as u64;
+            size += self.sample_info_sizes.len() as u64;
         }
 
         size
@@ -99,7 +103,6 @@ impl<R: Read + Seek> ReadBox<&mut R> for SaizBox {
             aux_info_type,
             aux_info_type_parameter,
             default_sample_info_size,
-            sample_count,
             sample_info_sizes,
         })
     }
@@ -127,7 +130,7 @@ impl<W: Write> WriteBox<&mut W> for SaizBox {
         }
 
         writer.write_u8(self.default_sample_info_size)?;
-        writer.write_u32::<BigEndian>(self.sample_count)?;
+        writer.write_u32::<BigEndian>(self.sample_info_sizes.len() as u32)?;
 
         if self.default_sample_info_size == 0 {
             for sample_info_size in &self.sample_info_sizes {
@@ -151,7 +154,6 @@ mod tests {
             aux_info_type: None,
             aux_info_type_parameter: None,
             default_sample_info_size: 8,
-            sample_count: 0,
             sample_info_sizes: vec![],
         };
 
@@ -183,7 +185,6 @@ mod tests {
             aux_info_type: Some(1),
             aux_info_type_parameter: Some(1),
             default_sample_info_size: 8,
-            sample_count: 0,
             sample_info_sizes: vec![],
         };
 
@@ -217,8 +218,7 @@ mod tests {
             aux_info_type: None,
             aux_info_type_parameter: None,
             default_sample_info_size: 0,
-            sample_count: 2,
-            sample_info_sizes: vec![1, 2],
+            sample_info_sizes: vec![32, 32, 32],
         };
 
         let mut buf = Vec::new();
@@ -226,10 +226,10 @@ mod tests {
         assert_eq!(buf.len(), src_box.box_size() as usize);
 
         let expected = vec![
-            0x00, 0x00, 0x00, 0x13, b's', b'a', b'i', b'z', // header
+            0x00, 0x00, 0x00, 0x14, b's', b'a', b'i', b'z', // header
             0x00, 0x00, 0x00, 0x00, // ext header
-            0x00, 0x00, 0x00, 0x00, 0x02, //
-            0x01, 0x02,
+            0x00, 0x00, 0x00, 0x00, 0x03, //
+            0x20, 0x20, 0x20,
         ];
 
         assert_eq!(buf, expected);

@@ -6,6 +6,7 @@ use tracing::debug;
 use crate::mp4box::*;
 use crate::mp4box::{tfdt::TfdtBox, tfhd::TfhdBox, trun::TrunBox};
 
+use super::saio::SaioBox;
 use super::saiz::SaizBox;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
@@ -16,6 +17,7 @@ pub struct TrafBox {
 
     pub senc: Option<SencBox>,
     pub saiz: Option<SaizBox>,
+    pub saio: Option<SaioBox>,
 }
 
 impl TrafBox {
@@ -32,13 +34,30 @@ impl TrafBox {
         if let Some(ref trun) = self.trun {
             size += trun.box_size();
         }
-        if let Some(ref senc) = self.senc {
-            size += senc.box_size();
-        }
         if let Some(ref saiz) = self.saiz {
             size += saiz.box_size();
         }
+        if let Some(ref saio) = self.saio {
+            size += saio.box_size();
+        }
+        if let Some(ref senc) = self.senc {
+            size += senc.box_size();
+        }
         size
+    }
+
+    /// Gets offset to be used in saio box.
+    /// It's the offset from the begging of the moof box to 16 bytes
+    /// into the senc box (where the sample data begins).
+    pub fn get_saio_offset(&self) -> u64 {
+        let Some(ref senc) = self.senc else {
+            return 0;
+        };
+
+        let mut end = self.get_size();
+        end -= senc.box_size();
+        end += 16; // 16 bytes into the senc box
+        end
     }
 }
 
@@ -70,6 +89,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
         let mut trun = None;
         let mut senc = None;
         let mut saiz = None;
+        let mut saio = None;
 
         let mut current = reader.stream_position()?;
         let end = start + size;
@@ -131,6 +151,13 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
             saiz = Some(SaizBox::read_box(reader, s, context)?);
         }
 
+        if let Some(saio_start) = boxes.remove(&BoxType::SaioBox) {
+            reader.seek(SeekFrom::Start(saio_start))?;
+            let header = BoxHeader::read(reader)?;
+            let BoxHeader { name: _, size: s } = header;
+            saio = Some(SaioBox::read_box(reader, s, context)?);
+        }
+
         for (name, _) in boxes {
             debug!("Skipping box: {:?}", name);
         }
@@ -143,6 +170,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for TrafBox {
             trun,
             senc,
             saiz,
+            saio,
         })
     }
 }
@@ -162,12 +190,16 @@ impl<W: Write> WriteBox<&mut W> for TrafBox {
             trun.write_box(writer)?;
         }
 
-        if let Some(ref senc) = self.senc {
-            senc.write_box(writer)?;
-        }
-
         if let Some(ref saiz) = self.saiz {
             saiz.write_box(writer)?;
+        }
+
+        if let Some(ref saio) = self.saio {
+            saio.write_box(writer)?;
+        }
+
+        if let Some(ref senc) = self.senc {
+            senc.write_box(writer)?;
         }
 
         Ok(size)
