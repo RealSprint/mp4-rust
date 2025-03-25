@@ -279,22 +279,23 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
                     .as_ref()
                     .map_or(0, |iv| iv.size()),
             ));
-
-            self.traf.saio.get_or_insert(saio::SaioBox::new(0));
-
-            let saiz = self.traf.saiz.get_or_insert(saiz::SaizBox::new(0));
-
             senc.add_iv(encryption.clone());
 
-            saiz.add_sample_info_size(2 + 6 * encryption.sub_samples().len() as u8);
+            if use_subsample_encryption {
+                self.traf.saio.get_or_insert(saio::SaioBox::new(0));
 
-            // It's important that the saio offset is updated after all other fields have been set
-            let offset = HEADER_SIZE + MFHD_SIZE + self.traf.get_saio_offset();
-            self.traf
-                .saio
-                .as_mut()
-                .expect("guaranteed insert above")
-                .set_single_offset(offset);
+                let saiz = self.traf.saiz.get_or_insert(saiz::SaizBox::new(0));
+
+                saiz.add_sample_info_size(2 + 6 * encryption.sub_samples().len() as u8);
+
+                // It's important that the saio offset is updated after all other fields have been set
+                let offset = HEADER_SIZE + MFHD_SIZE + self.traf.get_saio_offset();
+                self.traf
+                    .saio
+                    .as_mut()
+                    .expect("guaranteed insert above")
+                    .set_single_offset(offset);
+            }
         }
 
         Ok(duration as u64)
