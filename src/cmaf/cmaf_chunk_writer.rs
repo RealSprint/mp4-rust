@@ -282,6 +282,8 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             senc.add_iv(encryption.clone());
 
             if use_subsample_encryption {
+                self.traf.tfhd.flags |= TfhdBox::FLAG_DEFAULT_BASE_IS_MOOF;
+
                 self.traf.saio.get_or_insert(saio::SaioBox::new(0));
 
                 let saiz = self.traf.saiz.get_or_insert(saiz::SaizBox::new(0));
