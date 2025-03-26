@@ -4,6 +4,8 @@ use std::io::{Read, Seek, Write};
 
 use crate::mp4box::*;
 
+pub const MFHD_SIZE: u64 = HEADER_SIZE + HEADER_EXT_SIZE + 4;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct MfhdBox {
     pub version: u8,
@@ -27,7 +29,7 @@ impl MfhdBox {
     }
 
     pub fn get_size(&self) -> u64 {
-        HEADER_SIZE + HEADER_EXT_SIZE + 4
+        MFHD_SIZE
     }
 }
 
@@ -101,7 +103,8 @@ mod tests {
         assert_eq!(header.name, BoxType::MfhdBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = MfhdBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            MfhdBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }
