@@ -140,7 +140,8 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             track_id,
             flags: TfhdBox::FLAG_DEFAULT_SAMPLE_FLAGS
                 | TfhdBox::FLAG_DEFAULT_SAMPLE_DURATION
-                | TfhdBox::FLAG_DEFAULT_SAMPLE_SIZE,
+                | TfhdBox::FLAG_DEFAULT_SAMPLE_SIZE
+                | TfhdBox::FLAG_DEFAULT_BASE_IS_MOOF, // Required for DRM in Safari
             default_sample_flags: Some(config.default_sample_flags),
             default_sample_duration: Some(config.default_sample_duration),
             default_sample_size: Some(config.default_sample_size),
@@ -282,9 +283,6 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             senc.add_iv(encryption.clone());
 
             if use_subsample_encryption {
-                // This is actually always true for us, but only seems to be needed when DRM is used in Safari.
-                self.traf.tfhd.flags |= TfhdBox::FLAG_DEFAULT_BASE_IS_MOOF;
-
                 self.traf.saio.get_or_insert(saio::SaioBox::new(0));
 
                 let saiz = self.traf.saiz.get_or_insert(saiz::SaizBox::new(0));
