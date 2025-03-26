@@ -282,6 +282,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             senc.add_iv(encryption.clone());
 
             if use_subsample_encryption {
+                // This is actually always true for us, but only seems to be needed when DRM is used in Safari.
                 self.traf.tfhd.flags |= TfhdBox::FLAG_DEFAULT_BASE_IS_MOOF;
 
                 self.traf.saio.get_or_insert(saio::SaioBox::new(0));
