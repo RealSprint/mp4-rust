@@ -140,7 +140,8 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             track_id,
             flags: TfhdBox::FLAG_DEFAULT_SAMPLE_FLAGS
                 | TfhdBox::FLAG_DEFAULT_SAMPLE_DURATION
-                | TfhdBox::FLAG_DEFAULT_SAMPLE_SIZE,
+                | TfhdBox::FLAG_DEFAULT_SAMPLE_SIZE
+                | TfhdBox::FLAG_DEFAULT_BASE_IS_MOOF, // Required for DRM in Safari
             default_sample_flags: Some(config.default_sample_flags),
             default_sample_duration: Some(config.default_sample_duration),
             default_sample_size: Some(config.default_sample_size),
