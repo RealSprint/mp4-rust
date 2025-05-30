@@ -5,6 +5,8 @@ use prft::PrftBox;
 
 use crate::mfhd::{MfhdBox, MFHD_SIZE};
 use crate::mp4box::traf::TrafBox;
+use crate::psuedo_boxes::general_type_box::GeneralTypeBox;
+use crate::styp::StypBox;
 use crate::tfhd::TfhdBox;
 use crate::trun::TrunBox;
 use crate::*;
@@ -129,6 +131,7 @@ pub struct CmafChunkWriter<W> {
     traf: TrafBox,
     mfhd: MfhdBox,
     prft: Option<PrftBox>,
+    styp: Option<StypBox>,
     emsgs: Vec<EmsgBox>,
     samples: Vec<Bytes>,
     timescale: u32,
@@ -176,10 +179,19 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             traf,
             mfhd,
             prft,
+            styp: None,
             emsgs: vec![],
             samples: vec![],
             timescale: config.timescale,
         })
+    }
+
+    pub fn mark_new_segment(&mut self, cmaf_header_config: CmafHeaderConfig) {
+        self.styp = Some(StypBox(GeneralTypeBox {
+            major_brand: cmaf_header_config.major_brand,
+            minor_version: cmaf_header_config.minor_version,
+            compatible_brands: cmaf_header_config.compatible_brands,
+        }));
     }
 
     pub fn producer_reference_time(&self) -> Option<&PrftBox> {
@@ -307,6 +319,10 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     }
 
     pub fn write_end(&mut self, sequence_number: u32) -> Result<()> {
+        if let Some(styp) = self.styp.as_ref() {
+            styp.write_box(&mut self.writer)?;
+        }
+
         self.mfhd.sequence_number = sequence_number;
 
         let mut moof = MoofBox {
