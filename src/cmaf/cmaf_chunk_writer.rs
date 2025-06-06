@@ -205,7 +205,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             styp: StypBox(GeneralTypeBox {
                 major_brand: cmaf_header_config.major_brand,
                 minor_version: cmaf_header_config.minor_version,
-                compatible_brands: cmaf_header_config.compatible_brands.clone(),
+                compatible_brands,
             }),
             emsgs: vec![],
             samples: vec![],
