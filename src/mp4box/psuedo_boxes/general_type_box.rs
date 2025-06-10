@@ -60,7 +60,9 @@ impl GeneralTypeBox {
         let start = box_start(reader)?;
 
         if size < 16 || size % 4 != 0 {
-            return Err(Error::InvalidData("ftyp size too small or not aligned"));
+            return Err(Error::InvalidData(
+                "ftyp/styp size too small or not aligned",
+            ));
         }
         let brand_count = (size - 16) / 4; // header + major + minor
         let major = reader.read_u32::<BigEndian>()?;
