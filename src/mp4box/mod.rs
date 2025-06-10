@@ -108,6 +108,7 @@ pub(crate) mod stsd;
 pub(crate) mod stss;
 pub(crate) mod stsz;
 pub(crate) mod stts;
+pub(crate) mod styp;
 pub mod tenc;
 pub(crate) mod tfdt;
 pub(crate) mod tfhd;
@@ -272,7 +273,8 @@ boxtype! {
     EncaBox => 0x656e6361,
     SencBox => 0x73656e63,
     SaizBox => 0x7361697A,
-    SaioBox => 0x7361696F
+    SaioBox => 0x7361696F,
+    StypBox => 0x73747970
 }
 
 pub trait Mp4Box: Sized {

@@ -5,9 +5,26 @@ use prft::PrftBox;
 
 use crate::mfhd::{MfhdBox, MFHD_SIZE};
 use crate::mp4box::traf::TrafBox;
+use crate::psuedo_boxes::general_type_box::GeneralTypeBox;
+use crate::styp::StypBox;
 use crate::tfhd::TfhdBox;
 use crate::trun::TrunBox;
 use crate::*;
+
+// ISO 23001-19:2024 - 7.3.2.3
+pub const CMAF_CHUNK_IDENTIFIER: FourCC = FourCC {
+    value: [b'c', b'm', b'f', b'l'],
+};
+
+// ISO 23001-19:2024 - 7.3.2.4
+pub const CMAF_FRAGMENT_IDENTIFIER: FourCC = FourCC {
+    value: [b'c', b'm', b'f', b'f'],
+};
+
+// ISO 23001-19:2024 - 7.3.3.1
+pub const CMAF_SEGMENT_IDENTIFIER: FourCC = FourCC {
+    value: [b'c', b'm', b'f', b's'],
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CmafChunkConfig {
@@ -129,13 +146,19 @@ pub struct CmafChunkWriter<W> {
     traf: TrafBox,
     mfhd: MfhdBox,
     prft: Option<PrftBox>,
+    styp: StypBox,
     emsgs: Vec<EmsgBox>,
     samples: Vec<Bytes>,
     timescale: u32,
 }
 
 impl<W: Write + Seek> CmafChunkWriter<W> {
-    pub fn write_start(writer: W, track_id: u32, config: &CmafChunkConfig) -> Result<Self> {
+    pub fn write_start(
+        writer: W,
+        track_id: u32,
+        config: &CmafChunkConfig,
+        cmaf_header_config: CmafHeaderConfig,
+    ) -> Result<Self> {
         let tfhd = TfhdBox {
             track_id,
             flags: TfhdBox::FLAG_DEFAULT_SAMPLE_FLAGS
@@ -171,11 +194,19 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             media_time: prt.media_time,
         });
 
+        let mut compatible_brands = cmaf_header_config.compatible_brands.clone();
+        compatible_brands.push(CMAF_CHUNK_IDENTIFIER);
+
         Ok(CmafChunkWriter {
             writer,
             traf,
             mfhd,
             prft,
+            styp: StypBox(GeneralTypeBox {
+                major_brand: cmaf_header_config.major_brand,
+                minor_version: cmaf_header_config.minor_version,
+                compatible_brands,
+            }),
             emsgs: vec![],
             samples: vec![],
             timescale: config.timescale,
@@ -307,6 +338,8 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     }
 
     pub fn write_end(&mut self, sequence_number: u32) -> Result<()> {
+        self.styp.write_box(&mut self.writer)?;
+
         self.mfhd.sequence_number = sequence_number;
 
         let mut moof = MoofBox {
@@ -345,6 +378,14 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
 
     pub fn into_writer(self) -> W {
         self.writer
+    }
+
+    pub fn mark_new_fragment(&mut self) {
+        self.styp.0.compatible_brands.push(CMAF_FRAGMENT_IDENTIFIER);
+    }
+
+    pub fn mark_new_segment(&mut self) {
+        self.styp.0.compatible_brands.push(CMAF_SEGMENT_IDENTIFIER);
     }
 }
 
@@ -411,7 +452,22 @@ mod tests {
         let mut data = Cursor::new(data);
         data.set_position(size as u64);
 
-        let mut writer = CmafChunkWriter::write_start(data, 1, &config)?;
+        let mut writer = CmafChunkWriter::write_start(
+            data,
+            1,
+            &config,
+            CmafHeaderConfig {
+                compatible_brands: vec![
+                    str::parse("iso6").unwrap(),
+                    str::parse("cmfc").unwrap(),
+                    str::parse("mp41").unwrap(),
+                ],
+                major_brand: str::parse("iso6").unwrap(),
+                minor_version: 512,
+                timescale: 1000,
+                pssh: Vec::new(),
+            },
+        )?;
 
         writer.write_sample(&Mp4Sample {
             start_time: 10,

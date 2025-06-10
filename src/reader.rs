@@ -6,6 +6,7 @@ use prft::PrftBox;
 use tracing::debug;
 
 use crate::meta::MetaBox;
+use crate::styp::StypBox;
 use crate::*;
 
 #[derive(Debug)]
@@ -16,6 +17,7 @@ pub struct Mp4Reader<R> {
     pub moofs: Vec<MoofBox>,
     pub prfts: Vec<PrftBox>,
     pub emsgs: Vec<EmsgBox>,
+    pub styp: Option<StypBox>,
 
     tracks: HashMap<u32, Mp4Track>,
     size: u64,
@@ -56,6 +58,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
                 BoxType::FtypBox => {
                     ftyp = Some(FtypBox::read_box(&mut reader, s, &mut context)?);
                 }
+
                 BoxType::FreeBox => {
                     skip_box(&mut reader, s)?;
                 }
@@ -143,6 +146,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
         Ok(Mp4Reader {
             reader,
             ftyp: ftyp.unwrap(),
+            styp: None,
             moov: moov.unwrap(),
             moofs,
             emsgs,
@@ -160,6 +164,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
     ) -> Result<Mp4Reader<FR>> {
         let start = reader.stream_position()?;
 
+        let mut styp = None;
         let mut moofs = Vec::new();
         let mut prfts = Vec::new();
         let mut moof_offsets = Vec::new();
@@ -186,6 +191,9 @@ impl<R: Read + Seek> Mp4Reader<R> {
             match name {
                 BoxType::MdatBox => {
                     skip_box(&mut reader, s)?;
+                }
+                BoxType::StypBox => {
+                    styp = Some(StypBox::read_box(&mut reader, s, &mut context)?);
                 }
                 BoxType::EmsgBox => {
                     let emsg = EmsgBox::read_box(&mut reader, s, &mut context)?;
@@ -250,6 +258,7 @@ impl<R: Read + Seek> Mp4Reader<R> {
         Ok(Mp4Reader {
             reader,
             ftyp: self.ftyp.clone(),
+            styp,
             moov: self.moov.clone(),
             moofs,
             emsgs,

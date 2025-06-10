@@ -5,6 +5,7 @@ use pssh::PsshBox;
 
 use crate::mp4box::*;
 use crate::mvex::MvexBox;
+use crate::psuedo_boxes::general_type_box::GeneralTypeBox;
 use crate::track::Mp4TrackWriter;
 use crate::trex::TrexBox;
 use crate::*;
@@ -71,11 +72,11 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
         config: &CmafHeaderConfig,
         duration: Option<Duration>,
     ) -> Result<Self> {
-        let ftyp = FtypBox {
+        let ftyp = FtypBox(GeneralTypeBox {
             major_brand: config.major_brand,
             minor_version: config.minor_version,
             compatible_brands: config.compatible_brands.clone(),
-        };
+        });
         ftyp.write_box(&mut writer)?;
 
         let tracks = Vec::new();
