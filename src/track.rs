@@ -891,14 +891,17 @@ impl Mp4TrackWriter {
 
                 trak.mdia.minf.stbl.stsd.vp09 = Some(Vp09Box::new(config));
             }
-            MediaConfig::Av1Config(ref config) => {
-                trak.tkhd.set_width(config.width);
-                trak.tkhd.set_height(config.height);
+            MediaConfig::Av1Config(ref av1_config) => {
+                trak.tkhd.set_width(av1_config.width);
+                trak.tkhd.set_height(av1_config.height);
 
                 let vmhd = VmhdBox::default();
                 trak.mdia.minf.vmhd = Some(vmhd);
 
-                trak.mdia.minf.stbl.stsd.av01 = Some(Av01Box::new(config));
+                let mut av1 = Av01Box::new(av1_config);
+                av1.sinf = config.sinf.clone();
+
+                trak.mdia.minf.stbl.stsd.av01 = Some(Av01Box::new(av1_config));
             }
             MediaConfig::AacConfig(ref aac_config) => {
                 let smhd = SmhdBox::default();
