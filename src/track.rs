@@ -901,7 +901,7 @@ impl Mp4TrackWriter {
                 let mut av1 = Av01Box::new(av1_config);
                 av1.sinf = config.sinf.clone();
 
-                trak.mdia.minf.stbl.stsd.av01 = Some(Av01Box::new(av1_config));
+                trak.mdia.minf.stbl.stsd.av01 = Some(av1);
             }
             MediaConfig::AacConfig(ref aac_config) => {
                 let smhd = SmhdBox::default();
