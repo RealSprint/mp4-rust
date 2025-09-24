@@ -26,7 +26,7 @@ impl SaioBox {
             aux_info_type: None,
             aux_info_type_parameter: None,
             version,
-            offsets: vec![],
+            offsets: vec![0],
         }
     }
 
