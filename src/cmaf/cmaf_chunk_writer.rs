@@ -338,7 +338,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     }
 
     pub fn write_end(&mut self, sequence_number: u32) -> Result<()> {
-        self.styp.write_box(&mut self.writer)?;
+        // self.styp.write_box(&mut self.writer)?;
 
         self.mfhd.sequence_number = sequence_number;
 
