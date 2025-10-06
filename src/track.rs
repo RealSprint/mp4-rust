@@ -556,7 +556,8 @@ impl Mp4Track {
     fn sample_size(&self, sample_id: u32) -> Result<u32> {
         if !self.trafs.is_empty() {
             if let Some((traf_idx, sample_idx)) = self.find_traf_idx_and_sample_idx(sample_id) {
-                if let Some(size) = self.trafs[traf_idx]
+                let traf = &self.trafs[traf_idx];
+                if let Some(size) = traf
                     .trun
                     .as_ref()
                     .unwrap()
@@ -564,7 +565,9 @@ impl Mp4Track {
                     .get(sample_idx)
                 {
                     Ok(*size)
-                } else {
+                } else if let Some(default_sample_size) = &traf.tfhd.default_sample_size {
+                    Ok(*default_sample_size)
+                } else  {
                     Err(Error::EntryInTrunNotFound(
                         self.track_id(),
                         BoxType::TrunBox,
