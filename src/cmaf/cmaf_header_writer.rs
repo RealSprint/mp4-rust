@@ -26,6 +26,7 @@ pub struct CmafHeaderWriter<W> {
     timescale: u32,
     duration: Duration,
     pssh: Vec<PsshBox>,
+    trex_defaults: Vec<(u32, u32, u32)>,
 }
 
 impl<W> CmafHeaderWriter<W> {
@@ -87,6 +88,7 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
             timescale,
             duration: duration.unwrap_or(Duration::from_secs(0)),
             pssh: config.pssh.clone(),
+            trex_defaults: Vec::new(),
         })
     }
 
@@ -94,6 +96,11 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
         let track_id = self.tracks.len() as u32 + 1;
         let track = Mp4TrackWriter::new(track_id, config)?;
         self.tracks.push(track);
+        self.trex_defaults.push((
+            config.default_sample_duration.unwrap_or(0),
+            config.default_sample_size.unwrap_or(0),
+            config.default_sample_flags.unwrap_or(0),
+        ));
         Ok(())
     }
 
@@ -109,14 +116,19 @@ impl<W: Write + Seek> CmafHeaderWriter<W> {
         let duration = self.media_duration();
 
         for (i, track) in self.tracks.iter_mut().enumerate() {
+            let (dur, size, flags) = self
+                .trex_defaults
+                .get(i)
+                .copied()
+                .unwrap_or((0, 0, 0));
             let trex = TrexBox {
                 version: 0,
                 flags: 0,
                 track_id: (i + 1) as u32,
                 default_sample_description_index: 1,
-                default_sample_duration: 0,
-                default_sample_size: 0,
-                default_sample_flags: 0,
+                default_sample_duration: dur,
+                default_sample_size: size,
+                default_sample_flags: flags,
             };
 
             moov.mvex.as_mut().unwrap().trex.push(trex);
@@ -193,6 +205,9 @@ mod tests {
                 }),
                 aspect_ratio: Some((1, 1)),
             }),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         })?;
 
         writer.write_end()?;

@@ -139,6 +139,13 @@ impl From<Vp9Config> for CmafChunkConfig {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TrexDefaults {
+    pub default_sample_duration: u32,
+    pub default_sample_size: u32,
+    pub default_sample_flags: u32,
+}
+
 // TODO creation_time, modification_time
 #[derive(Debug)]
 pub struct CmafChunkWriter<W> {
@@ -150,6 +157,7 @@ pub struct CmafChunkWriter<W> {
     emsgs: Vec<EmsgBox>,
     samples: Vec<Bytes>,
     timescale: u32,
+    effective_default_sample_flags: u32,
 }
 
 impl<W: Write + Seek> CmafChunkWriter<W> {
@@ -158,16 +166,41 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         track_id: u32,
         config: &CmafChunkConfig,
         cmaf_header_config: CmafHeaderConfig,
+        trex_defaults: Option<&TrexDefaults>,
     ) -> Result<Self> {
+        let trex = trex_defaults.cloned().unwrap_or_default();
+
+        let mut tfhd_flags = TfhdBox::FLAG_DEFAULT_BASE_IS_MOOF; // Required for DRM in Safari
+
+        let tfhd_duration = if config.default_sample_duration != trex.default_sample_duration {
+            tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_DURATION;
+            Some(config.default_sample_duration)
+        } else {
+            None
+        };
+
+        let tfhd_size = if config.default_sample_size != trex.default_sample_size {
+            tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_SIZE;
+            Some(config.default_sample_size)
+        } else {
+            None
+        };
+
+        let tfhd_sample_flags = if config.default_sample_flags != trex.default_sample_flags {
+            tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_FLAGS;
+            Some(config.default_sample_flags)
+        } else {
+            None
+        };
+
+        let effective_default_sample_flags = config.default_sample_flags;
+
         let tfhd = TfhdBox {
             track_id,
-            flags: TfhdBox::FLAG_DEFAULT_SAMPLE_FLAGS
-                | TfhdBox::FLAG_DEFAULT_SAMPLE_DURATION
-                | TfhdBox::FLAG_DEFAULT_SAMPLE_SIZE
-                | TfhdBox::FLAG_DEFAULT_BASE_IS_MOOF, // Required for DRM in Safari
-            default_sample_flags: Some(config.default_sample_flags),
-            default_sample_duration: Some(config.default_sample_duration),
-            default_sample_size: Some(config.default_sample_size),
+            flags: tfhd_flags,
+            default_sample_flags: tfhd_sample_flags,
+            default_sample_duration: tfhd_duration,
+            default_sample_size: tfhd_size,
             ..TfhdBox::default()
         };
 
@@ -210,6 +243,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             emsgs: vec![],
             samples: vec![],
             timescale: config.timescale,
+            effective_default_sample_flags,
         })
     }
 
@@ -275,7 +309,7 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             base_media_decode_time: sample.start_time,
         });
         let sample_trun_flags = Self::sample_trun_flags(sample);
-        let has_first_sample_flags = Some(sample_trun_flags) != self.traf.tfhd.default_sample_flags;
+        let has_first_sample_flags = sample_trun_flags != self.effective_default_sample_flags;
         let trun = self.traf.trun.get_or_insert(TrunBox {
             version: 1,
             data_offset: Some(0), // Temp value
@@ -435,6 +469,9 @@ mod tests {
                 aspect_ratio: Some((1, 1)),
             }),
             sinf: Vec::new(),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         })?;
 
         writer.write_end()?;
@@ -467,6 +504,7 @@ mod tests {
                 timescale: 1000,
                 pssh: Vec::new(),
             },
+            None,
         )?;
 
         writer.write_sample(&Mp4Sample {
@@ -485,6 +523,122 @@ mod tests {
         let size = data.len() as u64;
 
         Mp4Reader::read_header(Cursor::new(data), size)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_chunk_with_trex_defaults() -> Result<()> {
+        let default_sample_duration = 10u32;
+        let default_sample_size = 7u32;
+        let default_sample_flags =
+            TrunBox::FLAG_SAMPLE_DEPENDS_YES | TrunBox::FLAG_SAMPLE_FLAG_IS_NON_SYNC;
+
+        let header_config = CmafHeaderConfig {
+            major_brand: str::parse("iso6").unwrap(),
+            minor_version: 512,
+            compatible_brands: vec![
+                str::parse("iso6").unwrap(),
+                str::parse("cmfc").unwrap(),
+                str::parse("mp41").unwrap(),
+            ],
+            timescale: 1000,
+            pssh: Vec::new(),
+        };
+        let data = Cursor::new(Vec::<u8>::new());
+
+        let mut header_writer = CmafHeaderWriter::write_start(data, &header_config, None)?;
+
+        header_writer.add_track(&TrackConfig {
+            track_type: TrackType::Video,
+            timescale: 1000,
+            language: "und".to_string(),
+            media_conf: MediaConfig::AvcConfig(AvcConfig {
+                width: 1920,
+                height: 1080,
+                seq_param_set: [
+                    103, 66, 192, 31, 149, 160, 20, 1, 110, 192, 90, 128, 128, 128, 160, 0, 0,
+                    125, 0, 0, 29, 76, 28, 0, 0, 4, 196, 176, 0, 2, 98, 90, 221, 229, 193, 64,
+                ]
+                .to_vec(),
+                pic_param_set: [104, 206, 60, 128].to_vec(),
+                color: None,
+                aspect_ratio: None,
+            }),
+            sinf: Vec::new(),
+            default_sample_duration: Some(default_sample_duration),
+            default_sample_size: Some(default_sample_size),
+            default_sample_flags: Some(default_sample_flags),
+        })?;
+
+        header_writer.write_end()?;
+
+        let data = header_writer.into_writer().into_inner();
+
+        // Write a chunk whose config matches the trex defaults exactly
+        let chunk_config = CmafChunkConfig {
+            timescale: 1000,
+            default_sample_duration,
+            default_sample_size,
+            default_sample_flags,
+            producer_reference_time: None,
+        };
+
+        let trex_defaults = TrexDefaults {
+            default_sample_duration,
+            default_sample_size,
+            default_sample_flags,
+        };
+
+        let size = data.len();
+        let mut data = Cursor::new(data);
+        data.set_position(size as u64);
+
+        let mut chunk_writer = CmafChunkWriter::write_start(
+            data,
+            1,
+            &chunk_config,
+            header_config.clone(),
+            Some(&trex_defaults),
+        )?;
+
+        let sample_data = vec![0u8; default_sample_size as usize];
+        chunk_writer.write_sample(&Mp4Sample {
+            start_time: 0,
+            duration: default_sample_duration,
+            rendering_offset: 0,
+            is_sync: false,
+            bytes: Bytes::from(sample_data.clone()),
+            encryption: None,
+        })?;
+
+        chunk_writer.write_sample(&Mp4Sample {
+            start_time: default_sample_duration as u64,
+            duration: default_sample_duration,
+            rendering_offset: 0,
+            is_sync: false,
+            bytes: Bytes::from(sample_data.clone()),
+            encryption: None,
+        })?;
+
+        chunk_writer.write_end(1)?;
+
+        let data: Vec<u8> = chunk_writer.into_writer().into_inner();
+        let total_size = data.len() as u64;
+
+        let mut reader = Mp4Reader::read_header(Cursor::new(data), total_size)?;
+
+        assert_eq!(reader.sample_count(1)?, 2);
+
+        let sample1 = reader.read_sample(1, 1)?.expect("sample 1");
+        assert_eq!(sample1.bytes.len(), default_sample_size as usize);
+        assert_eq!(sample1.duration, default_sample_duration);
+        assert!(!sample1.is_sync);
+
+        let sample2 = reader.read_sample(1, 2)?.expect("sample 2");
+        assert_eq!(sample2.bytes.len(), default_sample_size as usize);
+        assert_eq!(sample2.duration, default_sample_duration);
+        assert!(!sample2.is_sync);
 
         Ok(())
     }

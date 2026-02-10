@@ -28,6 +28,9 @@ pub struct TrackConfig {
     pub language: String,
     pub media_conf: MediaConfig,
     pub sinf: Vec<SinfBox>,
+    pub default_sample_duration: Option<u32>,
+    pub default_sample_size: Option<u32>,
+    pub default_sample_flags: Option<u32>,
 }
 
 impl From<MediaConfig> for TrackConfig {
@@ -52,6 +55,9 @@ impl From<AvcConfig> for TrackConfig {
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AvcConfig(avc_conf),
             sinf: Vec::new(),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         }
     }
 }
@@ -64,6 +70,9 @@ impl From<HevcConfig> for TrackConfig {
             language: String::from("und"), // XXX
             media_conf: MediaConfig::HevcConfig(hevc_conf),
             sinf: Vec::new(),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         }
     }
 }
@@ -76,6 +85,9 @@ impl From<Av1Config> for TrackConfig {
             language: String::from("und"), // XXX
             media_conf: MediaConfig::Av1Config(av1_conf),
             sinf: Vec::new(),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         }
     }
 }
@@ -88,6 +100,9 @@ impl From<AacConfig> for TrackConfig {
             language: String::from("und"), // XXX
             media_conf: MediaConfig::AacConfig(aac_conf),
             sinf: Vec::new(),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         }
     }
 }
@@ -100,6 +115,9 @@ impl From<OpusConfig> for TrackConfig {
             language: String::from("und"), // XXX
             media_conf: MediaConfig::OpusConfig(opus_conf),
             sinf: Vec::new(),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         }
     }
 }
@@ -112,6 +130,9 @@ impl From<TtxtConfig> for TrackConfig {
             language: String::from("und"), // XXX
             media_conf: MediaConfig::TtxtConfig(txtt_conf),
             sinf: Vec::new(),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         }
     }
 }
@@ -124,6 +145,9 @@ impl From<Vp9Config> for TrackConfig {
             language: String::from("und"), // XXX
             media_conf: MediaConfig::Vp9Config(vp9_conf),
             sinf: Vec::new(),
+            default_sample_duration: None,
+            default_sample_size: None,
+            default_sample_flags: None,
         }
     }
 }
@@ -136,6 +160,8 @@ pub struct Mp4Track {
 
     // Fragmented Tracks Defaults.
     pub default_sample_duration: u32,
+    pub default_sample_size: u32,
+    pub default_sample_flags: u32,
     encryption_data: VecDeque<SampleEncryption>,
 }
 
@@ -147,6 +173,8 @@ impl Mp4Track {
             trafs: Vec::new(),
             moof_offsets: Vec::new(),
             default_sample_duration: 0,
+            default_sample_size: 0,
+            default_sample_flags: 0,
             encryption_data: VecDeque::new(),
         }
     }
@@ -567,7 +595,9 @@ impl Mp4Track {
                     Ok(*size)
                 } else if let Some(default_sample_size) = &traf.tfhd.default_sample_size {
                     Ok(*default_sample_size)
-                } else  {
+                } else if self.default_sample_size > 0 {
+                    Ok(self.default_sample_size)
+                } else {
                     Err(Error::EntryInTrunNotFound(
                         self.track_id(),
                         BoxType::TrunBox,
@@ -774,6 +804,12 @@ impl Mp4Track {
             if let Some(default_sample_flags) = tfhd.default_sample_flags {
                 return (TrunBox::FLAG_SAMPLE_DEPENDS_YES | TrunBox::FLAG_SAMPLE_FLAG_IS_NON_SYNC)
                     & default_sample_flags
+                    == 0;
+            }
+
+            if self.default_sample_flags != 0 {
+                return (TrunBox::FLAG_SAMPLE_DEPENDS_YES | TrunBox::FLAG_SAMPLE_FLAG_IS_NON_SYNC)
+                    & self.default_sample_flags
                     == 0;
             }
         }
