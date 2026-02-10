@@ -139,13 +139,6 @@ impl From<Vp9Config> for CmafChunkConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct TrexDefaults {
-    pub default_sample_duration: u32,
-    pub default_sample_size: u32,
-    pub default_sample_flags: u32,
-}
-
 // TODO creation_time, modification_time
 #[derive(Debug)]
 pub struct CmafChunkWriter<W> {
@@ -166,32 +159,36 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         track_id: u32,
         config: &CmafChunkConfig,
         cmaf_header_config: CmafHeaderConfig,
-        trex_defaults: Option<&TrexDefaults>,
+        track_config: Option<&TrackConfig>,
     ) -> Result<Self> {
-        let trex = trex_defaults.cloned().unwrap_or_default();
-
         let mut tfhd_flags = TfhdBox::FLAG_DEFAULT_BASE_IS_MOOF; // Required for DRM in Safari
 
-        let tfhd_duration = if config.default_sample_duration != trex.default_sample_duration {
-            tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_DURATION;
-            Some(config.default_sample_duration)
-        } else {
-            None
-        };
+        let trex_duration = track_config.and_then(|tc| tc.default_sample_duration);
+        let tfhd_duration =
+            if trex_duration != Some(config.default_sample_duration) {
+                tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_DURATION;
+                Some(config.default_sample_duration)
+            } else {
+                None
+            };
 
-        let tfhd_size = if config.default_sample_size != trex.default_sample_size {
-            tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_SIZE;
-            Some(config.default_sample_size)
-        } else {
-            None
-        };
+        let trex_size = track_config.and_then(|tc| tc.default_sample_size);
+        let tfhd_size =
+            if trex_size != Some(config.default_sample_size) {
+                tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_SIZE;
+                Some(config.default_sample_size)
+            } else {
+                None
+            };
 
-        let tfhd_sample_flags = if config.default_sample_flags != trex.default_sample_flags {
-            tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_FLAGS;
-            Some(config.default_sample_flags)
-        } else {
-            None
-        };
+        let trex_flags = track_config.and_then(|tc| tc.default_sample_flags);
+        let tfhd_sample_flags =
+            if trex_flags != Some(config.default_sample_flags) {
+                tfhd_flags |= TfhdBox::FLAG_DEFAULT_SAMPLE_FLAGS;
+                Some(config.default_sample_flags)
+            } else {
+                None
+            };
 
         let effective_default_sample_flags = config.default_sample_flags;
 
@@ -549,7 +546,7 @@ mod tests {
 
         let mut header_writer = CmafHeaderWriter::write_start(data, &header_config, None)?;
 
-        header_writer.add_track(&TrackConfig {
+        let track_config = TrackConfig {
             track_type: TrackType::Video,
             timescale: 1000,
             language: "und".to_string(),
@@ -569,7 +566,9 @@ mod tests {
             default_sample_duration: Some(default_sample_duration),
             default_sample_size: Some(default_sample_size),
             default_sample_flags: Some(default_sample_flags),
-        })?;
+        };
+
+        header_writer.add_track(&track_config)?;
 
         header_writer.write_end()?;
 
@@ -584,12 +583,6 @@ mod tests {
             producer_reference_time: None,
         };
 
-        let trex_defaults = TrexDefaults {
-            default_sample_duration,
-            default_sample_size,
-            default_sample_flags,
-        };
-
         let size = data.len();
         let mut data = Cursor::new(data);
         data.set_position(size as u64);
@@ -599,7 +592,7 @@ mod tests {
             1,
             &chunk_config,
             header_config.clone(),
-            Some(&trex_defaults),
+            Some(&track_config),
         )?;
 
         let sample_data = vec![0u8; default_sample_size as usize];
