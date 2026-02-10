@@ -151,6 +151,8 @@ pub struct CmafChunkWriter<W> {
     samples: Vec<Bytes>,
     timescale: u32,
     effective_default_sample_flags: u32,
+    effective_default_sample_duration: u32,
+    effective_default_sample_size: u32,
 }
 
 impl<W: Write + Seek> CmafChunkWriter<W> {
@@ -241,6 +243,8 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
             samples: vec![],
             timescale: config.timescale,
             effective_default_sample_flags,
+            effective_default_sample_duration: config.default_sample_duration,
+            effective_default_sample_size: config.default_sample_size,
         })
     }
 
@@ -368,7 +372,41 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
         self.emsgs.push(emsg);
     }
 
+    fn finalize_trun_flags(&mut self) {
+        let default_duration = self.effective_default_sample_duration;
+        let default_size = self.effective_default_sample_size;
+
+        let Some(ref mut trun) = self.traf.trun else {
+            return;
+        };
+
+        // Strip FLAG_SAMPLE_DURATION if all samples match the effective default
+        if default_duration != 0
+            && trun
+                .sample_durations
+                .iter()
+                .all(|d| *d == default_duration)
+        {
+            trun.flags &= !TrunBox::FLAG_SAMPLE_DURATION;
+        }
+
+        // Strip FLAG_SAMPLE_SIZE if all samples match the effective default
+        if default_size != 0 && trun.sample_sizes.iter().all(|s| *s == default_size) {
+            trun.flags &= !TrunBox::FLAG_SAMPLE_SIZE;
+        }
+
+        // Recompute saio offset since trun size may have changed
+        if self.traf.senc.is_some() {
+            let offset = HEADER_SIZE + MFHD_SIZE + self.traf.get_saio_offset();
+            if let Some(ref mut saio) = self.traf.saio {
+                saio.set_single_offset(offset);
+            }
+        }
+    }
+
     pub fn write_end(&mut self, sequence_number: u32) -> Result<()> {
+        self.finalize_trun_flags();
+
         self.styp.write_box(&mut self.writer)?;
 
         self.mfhd.sequence_number = sequence_number;
@@ -632,6 +670,117 @@ mod tests {
         assert_eq!(sample2.bytes.len(), default_sample_size as usize);
         assert_eq!(sample2.duration, default_sample_duration);
         assert!(!sample2.is_sync);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_chunk_mixed_durations_keep_flag() -> Result<()> {
+        let default_sample_duration = 10u32;
+        let default_sample_size = 7u32;
+        let default_sample_flags =
+            TrunBox::FLAG_SAMPLE_DEPENDS_YES | TrunBox::FLAG_SAMPLE_FLAG_IS_NON_SYNC;
+
+        let header_config = CmafHeaderConfig {
+            major_brand: str::parse("iso6").unwrap(),
+            minor_version: 512,
+            compatible_brands: vec![
+                str::parse("iso6").unwrap(),
+                str::parse("cmfc").unwrap(),
+                str::parse("mp41").unwrap(),
+            ],
+            timescale: 1000,
+            pssh: Vec::new(),
+        };
+        let data = Cursor::new(Vec::<u8>::new());
+
+        let mut header_writer = CmafHeaderWriter::write_start(data, &header_config, None)?;
+
+        let track_config = TrackConfig {
+            track_type: TrackType::Video,
+            timescale: 1000,
+            language: "und".to_string(),
+            media_conf: MediaConfig::AvcConfig(AvcConfig {
+                width: 1920,
+                height: 1080,
+                seq_param_set: [
+                    103, 66, 192, 31, 149, 160, 20, 1, 110, 192, 90, 128, 128, 128, 160, 0, 0,
+                    125, 0, 0, 29, 76, 28, 0, 0, 4, 196, 176, 0, 2, 98, 90, 221, 229, 193, 64,
+                ]
+                .to_vec(),
+                pic_param_set: [104, 206, 60, 128].to_vec(),
+                color: None,
+                aspect_ratio: None,
+            }),
+            sinf: Vec::new(),
+            default_sample_duration: Some(default_sample_duration),
+            default_sample_size: Some(default_sample_size),
+            default_sample_flags: Some(default_sample_flags),
+        };
+
+        header_writer.add_track(&track_config)?;
+        header_writer.write_end()?;
+
+        let data = header_writer.into_writer().into_inner();
+
+        let chunk_config = CmafChunkConfig {
+            timescale: 1000,
+            default_sample_duration,
+            default_sample_size,
+            default_sample_flags,
+            producer_reference_time: None,
+        };
+
+        let size = data.len();
+        let mut data = Cursor::new(data);
+        data.set_position(size as u64);
+
+        let mut chunk_writer = CmafChunkWriter::write_start(
+            data,
+            1,
+            &chunk_config,
+            header_config.clone(),
+            Some(&track_config),
+        )?;
+
+        let sample_data = vec![0u8; default_sample_size as usize];
+
+        // First sample: matches default duration
+        chunk_writer.write_sample(&Mp4Sample {
+            start_time: 0,
+            duration: default_sample_duration,
+            rendering_offset: 0,
+            is_sync: false,
+            bytes: Bytes::from(sample_data.clone()),
+            encryption: None,
+        })?;
+
+        // Second sample: different duration (does NOT match default)
+        chunk_writer.write_sample(&Mp4Sample {
+            start_time: default_sample_duration as u64,
+            duration: default_sample_duration + 5,
+            rendering_offset: 0,
+            is_sync: false,
+            bytes: Bytes::from(sample_data.clone()),
+            encryption: None,
+        })?;
+
+        chunk_writer.write_end(1)?;
+
+        let data: Vec<u8> = chunk_writer.into_writer().into_inner();
+        let total_size = data.len() as u64;
+
+        let mut reader = Mp4Reader::read_header(Cursor::new(data), total_size)?;
+
+        assert_eq!(reader.sample_count(1)?, 2);
+
+        let sample1 = reader.read_sample(1, 1)?.expect("sample 1");
+        assert_eq!(sample1.bytes.len(), default_sample_size as usize);
+        assert_eq!(sample1.duration, default_sample_duration);
+
+        let sample2 = reader.read_sample(1, 2)?.expect("sample 2");
+        assert_eq!(sample2.bytes.len(), default_sample_size as usize);
+        assert_eq!(sample2.duration, default_sample_duration + 5);
 
         Ok(())
     }
