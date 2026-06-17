@@ -427,7 +427,8 @@ mod tests {
         assert_eq!(header.name, BoxType::Avc1Box);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Avc1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            Avc1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -470,7 +471,8 @@ mod tests {
         assert_eq!(header.name, BoxType::EncvBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Avc1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            Avc1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

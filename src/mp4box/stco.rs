@@ -135,7 +135,8 @@ mod tests {
         assert_eq!(header.name, BoxType::StcoBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = StcoBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            StcoBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

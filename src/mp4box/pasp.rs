@@ -88,7 +88,8 @@ mod tests {
         assert_eq!(header.name, BoxType::PaspBox);
         assert_eq!(pasp_box.box_size(), header.size);
 
-        let dst_box = PaspBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            PaspBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(pasp_box, dst_box);
     }
 
@@ -107,7 +108,8 @@ mod tests {
         assert_eq!(header.name, BoxType::PaspBox);
         assert_eq!(pasp_box.box_size(), header.size);
 
-        let dst_box = PaspBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            PaspBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(pasp_box, dst_box);
     }
 }

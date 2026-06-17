@@ -183,7 +183,8 @@ mod tests {
         assert_eq!(header.name, BoxType::Tx3gBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Tx3gBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            Tx3gBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

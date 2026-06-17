@@ -224,7 +224,8 @@ mod tests {
         assert_eq!(header.name, BoxType::MvhdBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = MvhdBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            MvhdBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -251,7 +252,8 @@ mod tests {
         assert_eq!(header.name, BoxType::MvhdBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = MvhdBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            MvhdBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

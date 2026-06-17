@@ -199,7 +199,8 @@ mod tests {
         assert_eq!(header.name, BoxType::Vp09Box);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = Vp09Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            Vp09Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

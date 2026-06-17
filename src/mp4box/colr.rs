@@ -144,7 +144,8 @@ mod tests {
         assert_eq!(header.name, BoxType::ColrBox);
         assert_eq!(colr_box.box_size(), header.size);
 
-        let dst_box = ColrBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            ColrBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(colr_box, dst_box);
     }
 
@@ -162,7 +163,8 @@ mod tests {
         assert_eq!(header.name, BoxType::ColrBox);
         assert_eq!(colr_box.box_size(), header.size);
 
-        let dst_box = ColrBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            ColrBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(colr_box, dst_box);
     }
 }
