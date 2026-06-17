@@ -236,6 +236,7 @@ impl Mp4Track {
             MediaType::H265 => Ok(MediaConfig::HevcConfig(HevcConfig {
                 width: self.width(),
                 height: self.height(),
+                hvcc: self.trak.mdia.minf.stbl.stsd.hev1.as_ref().map(|hev1| hev1.hvcc.clone()).unwrap_or_default(),
             })),
             MediaType::AV1 => {
                 if let Some(av01) = self.trak.mdia.minf.stbl.stsd.av01.as_ref() {

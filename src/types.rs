@@ -631,6 +631,7 @@ pub struct AvcConfig {
 pub struct HevcConfig {
     pub width: u16,
     pub height: u16,
+    pub hvcc: HvcCBox,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]

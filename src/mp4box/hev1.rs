@@ -50,7 +50,7 @@ impl Hev1Box {
             vertresolution: FixedPointU16::new(0x48),
             frame_count: 1,
             depth: 0x0018,
-            hvcc: HvcCBox::new(),
+            hvcc: config.hvcc.clone(),
             sinf: Vec::new(),
         }
     }

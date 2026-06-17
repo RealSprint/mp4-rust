@@ -59,6 +59,7 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
             MediaType::H265 => MediaConfig::HevcConfig(HevcConfig {
                 width: track.width(),
                 height: track.height(),
+                ..Default::default()
             }),
             MediaType::VP9 => MediaConfig::Vp9Config(Vp9Config {
                 width: track.width(),
