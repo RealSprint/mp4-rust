@@ -2,7 +2,7 @@
 name = "mp4"
 version = "0.14.0"
 authors = ["Alf <alf.g.jr@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "MP4 reader and writer library in Rust."
 documentation = "https://docs.rs/mp4"
 readme = "README.md"
@@ -24,7 +24,7 @@ serde_json = "1.0"
 tracing = "0.1.41"
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.5"
 
 [[bench]]
 name = "bench_main"
