@@ -59,7 +59,10 @@ impl GeneralTypeBox {
     ) -> Result<Self> {
         let start = box_start(reader)?;
 
-        if size < 16 || !size.is_multiple_of(4) {
+        // `u64::is_multiple_of` is stable only since Rust 1.87; the modulo form
+        // keeps the crate's MSRV at 1.80 (bounded by `Seek::seek_relative`).
+        #[allow(clippy::manual_is_multiple_of)]
+        if size < 16 || size % 4 != 0 {
             return Err(Error::InvalidData(
                 "ftyp/styp size too small or not aligned",
             ));

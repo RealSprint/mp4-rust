@@ -35,3 +35,15 @@ jobs:
 
       - name: Cargo test
         run: cargo test
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install MSRV toolchain
+        uses: dtolnay/rust-toolchain@1.80.0
+
+      - name: Build library on MSRV
+        run: cargo build --lib
