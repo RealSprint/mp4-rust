@@ -390,11 +390,13 @@ impl<W: Write> WriteBox<&mut W> for HvcCBox {
         writer.write_u48::<BigEndian>(self.general_constraint_indicator_flag)?;
         writer.write_u8(self.general_level_idc)?;
 
-        writer.write_u16::<BigEndian>(self.min_spatial_segmentation_idc & 0x0FFF)?;
-        writer.write_u8(self.parallelism_type & 0b11)?;
-        writer.write_u8(self.chroma_format_idc & 0b11)?;
-        writer.write_u8(self.bit_depth_luma_minus8 & 0b111)?;
-        writer.write_u8(self.bit_depth_chroma_minus8 & 0b111)?;
+        // The high bits of each of these fields are `reserved` and ISO/IEC 14496-15
+        // §8.3.3.1.2 requires them to be all-1s, not 0. The reader masks them back off.
+        writer.write_u16::<BigEndian>(0xF000 | (self.min_spatial_segmentation_idc & 0x0FFF))?;
+        writer.write_u8(0b1111_1100 | (self.parallelism_type & 0b11))?;
+        writer.write_u8(0b1111_1100 | (self.chroma_format_idc & 0b11))?;
+        writer.write_u8(0b1111_1000 | (self.bit_depth_luma_minus8 & 0b111))?;
+        writer.write_u8(0b1111_1000 | (self.bit_depth_chroma_minus8 & 0b111))?;
         writer.write_u16::<BigEndian>(self.avg_frame_rate)?;
 
         let constant_frame_rate = (self.constant_frame_rate & 0b11) << 6;
@@ -487,6 +489,33 @@ mod tests {
         let dst_box =
             HvcCBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_hvcc_writes_reserved_bits_as_ones() {
+        // ISO/IEC 14496-15 §8.3.3.1.2: the reserved high bits of these five fields must be
+        // all-1s. Use low-bit values that don't themselves set the reserved bits, so the
+        // assertion only passes if the writer ORs the reserved 1s in.
+        let src_box = HvcCBox {
+            configuration_version: 1,
+            min_spatial_segmentation_idc: 0x0123,
+            parallelism_type: 0b10,
+            chroma_format_idc: 0b01,
+            bit_depth_luma_minus8: 0b000,
+            bit_depth_chroma_minus8: 0b010,
+            ..Default::default()
+        };
+
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+
+        // Offsets are after the 8-byte box header:
+        // version(1) + profile byte(1) + compat(4) + constraint(6) + level(1) = 13 -> +8 = 21.
+        assert_eq!(
+            &buf[21..27],
+            // 0xF000|0x0123, 0b111111|10, 0b111111|01, 0b11111|000, 0b11111|010
+            &[0xF1, 0x23, 0xFE, 0xFD, 0xF8, 0xFA],
+        );
     }
 
     #[test]
