@@ -112,7 +112,8 @@ mod tests {
         assert_eq!(header.name, BoxType::UdtaBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = UdtaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            UdtaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 
@@ -131,7 +132,8 @@ mod tests {
         assert_eq!(header.name, BoxType::UdtaBox);
         assert_eq!(header.size, src_box.box_size());
 
-        let dst_box = UdtaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            UdtaBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(dst_box, src_box);
     }
 }

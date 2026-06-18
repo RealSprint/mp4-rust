@@ -233,7 +233,7 @@ impl UrlBox {
         let mut size = HEADER_SIZE + HEADER_EXT_SIZE;
 
         if !self.location.is_empty() {
-            size += self.location.bytes().len() as u64 + 1;
+            size += self.location.len() as u64 + 1;
         }
 
         size

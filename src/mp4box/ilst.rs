@@ -179,7 +179,7 @@ impl<R: Read + Seek> ReadBox<&mut R> for IlstItemBox {
 }
 
 impl Metadata<'_> for IlstBox {
-    fn title(&self) -> Option<Cow<str>> {
+    fn title(&self) -> Option<Cow<'_, str>> {
         self.items.get(&MetadataKey::Title).map(item_to_str)
     }
 
@@ -191,7 +191,7 @@ impl Metadata<'_> for IlstBox {
         self.items.get(&MetadataKey::Poster).map(item_to_bytes)
     }
 
-    fn summary(&self) -> Option<Cow<str>> {
+    fn summary(&self) -> Option<Cow<'_, str>> {
         self.items.get(&MetadataKey::Summary).map(item_to_str)
     }
 }
@@ -200,7 +200,7 @@ fn item_to_bytes(item: &IlstItemBox) -> &[u8] {
     &item.data.data
 }
 
-fn item_to_str(item: &IlstItemBox) -> Cow<str> {
+fn item_to_str(item: &IlstItemBox) -> Cow<'_, str> {
     String::from_utf8_lossy(&item.data.data)
 }
 
@@ -244,7 +244,8 @@ mod tests {
         assert_eq!(header.name, BoxType::IlstBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = IlstBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            IlstBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 
@@ -260,7 +261,8 @@ mod tests {
         assert_eq!(header.name, BoxType::IlstBox);
         assert_eq!(src_box.box_size(), header.size);
 
-        let dst_box = IlstBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        let dst_box =
+            IlstBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
     }
 }

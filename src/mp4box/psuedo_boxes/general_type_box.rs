@@ -59,7 +59,7 @@ impl GeneralTypeBox {
     ) -> Result<Self> {
         let start = box_start(reader)?;
 
-        if size < 16 || size % 4 != 0 {
+        if size < 16 || !size.is_multiple_of(4) {
             return Err(Error::InvalidData(
                 "ftyp/styp size too small or not aligned",
             ));

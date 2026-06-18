@@ -2,9 +2,9 @@ name: Rust
 
 on:
   push:
-    branches: [ master ]
+    branches: [ cmaf ]
   pull_request:
-    branches: [ master ]
+    branches: [ cmaf ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,37 +14,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
           components: rustfmt, clippy
 
       - name: Setup rust smart caching
-        uses: Swatinem/rust-cache@v1.3.0
+        uses: Swatinem/rust-cache@v2
 
       - name: Cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
 
       - name: Cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --no-deps -- -D warnings
-      
+        run: cargo clippy --all-targets --no-deps -- -D warnings
+
       - name: Cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-      
+        run: cargo build --all-targets
+
       - name: Cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install MSRV toolchain
+        uses: dtolnay/rust-toolchain@1.90.0
+
+      - name: Build library on MSRV
+        run: cargo build --lib
