@@ -3,9 +3,9 @@ name = "mp4"
 version = "0.14.0"
 authors = ["Alf <alf.g.jr@gmail.com>"]
 edition = "2021"
-# Library MSRV, bounded by Seek::seek_relative (stable since 1.80). Verified in
-# CI by the `msrv` job. Dev/test tooling (criterion) requires a newer toolchain.
-rust-version = "1.80"
+# Library MSRV, verified in CI by the `msrv` job. Dev/test tooling (criterion)
+# requires a newer toolchain.
+rust-version = "1.90"
 description = "MP4 reader and writer library in Rust."
 documentation = "https://docs.rs/mp4"
 readme = "README.md"
