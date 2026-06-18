@@ -5,7 +5,7 @@ use std::io::{self, BufReader, BufWriter};
 use std::path::Path;
 
 use mp4::{
-    AacConfig, AvcConfig, HevcConfig, MediaConfig, MediaType, Mp4Config, Result, TrackConfig,
+    AacConfig, AvcConfig, MediaConfig, MediaType, Mp4Config, Result, TrackConfig,
     TtxtConfig, Vp9Config,
 };
 
@@ -56,11 +56,10 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
                 color: None,
                 aspect_ratio: None,
             }),
-            MediaType::H265 => MediaConfig::HevcConfig(HevcConfig {
-                width: track.width(),
-                height: track.height(),
-                ..Default::default()
-            }),
+            // Use media_config() so the source hvcC (parameter sets etc.) is
+            // carried through; a default HevcConfig would emit an empty,
+            // unplayable hvcC.
+            MediaType::H265 => track.media_config()?,
             MediaType::VP9 => MediaConfig::Vp9Config(Vp9Config {
                 width: track.width(),
                 height: track.height(),
