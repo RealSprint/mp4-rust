@@ -4,10 +4,7 @@ use std::io::prelude::*;
 use std::io::{self, BufReader, BufWriter};
 use std::path::Path;
 
-use mp4::{
-    AacConfig, AvcConfig, HevcConfig, MediaConfig, MediaType, Mp4Config, Result, TrackConfig,
-    TtxtConfig, Vp9Config,
-};
+use mp4::{Mp4Config, Result, TrackConfig};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -47,33 +44,10 @@ fn copy<P: AsRef<Path>>(src_filename: &P, dst_filename: &P) -> Result<()> {
 
     for track_id in track_ids.iter() {
         let track = mp4_reader.tracks().get(track_id).unwrap();
-        let media_conf = match track.media_type()? {
-            MediaType::H264 => MediaConfig::AvcConfig(AvcConfig {
-                width: track.width(),
-                height: track.height(),
-                seq_param_set: track.sequence_parameter_set()?.to_vec(),
-                pic_param_set: track.picture_parameter_set()?.to_vec(),
-                color: None,
-                aspect_ratio: None,
-            }),
-            MediaType::H265 => MediaConfig::HevcConfig(HevcConfig {
-                width: track.width(),
-                height: track.height(),
-            }),
-            MediaType::VP9 => MediaConfig::Vp9Config(Vp9Config {
-                width: track.width(),
-                height: track.height(),
-            }),
-            MediaType::AAC => MediaConfig::AacConfig(AacConfig {
-                bitrate: track.bitrate(),
-                profile: track.audio_profile()?,
-                freq_index: track.sample_freq_index()?,
-                chan_conf: track.channel_config()?,
-            }),
-            MediaType::TTXT => MediaConfig::TtxtConfig(TtxtConfig {}),
-            MediaType::AV1 => todo!(),
-            MediaType::OPUS => todo!(),
-        };
+        // `media_config()` builds the right MediaConfig for every supported codec
+        // (carrying source-specific data like the HEVC hvcC, H.264 color/aspect, etc.),
+        // so the example does not need a per-codec match that can drift or `todo!()`.
+        let media_conf = track.media_config()?;
 
         let track_conf = TrackConfig {
             track_type: track.track_type()?,

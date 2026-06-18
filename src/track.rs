@@ -233,10 +233,16 @@ impl Mp4Track {
                 color: self.color_config().cloned(),
                 aspect_ratio: self.aspect_ratio(),
             })),
-            MediaType::H265 => Ok(MediaConfig::HevcConfig(HevcConfig {
-                width: self.width(),
-                height: self.height(),
-            })),
+            MediaType::H265 => {
+                if let Some(hev1) = self.trak.mdia.minf.stbl.stsd.hev1.as_ref() {
+                    return Ok(MediaConfig::HevcConfig(HevcConfig {
+                        width: self.width(),
+                        height: self.height(),
+                        hvcc: hev1.hvcc.clone(),
+                    }));
+                }
+                Err(Error::BoxNotFound(BoxType::Hev1Box))
+            }
             MediaType::AV1 => {
                 if let Some(av01) = self.trak.mdia.minf.stbl.stsd.av01.as_ref() {
                     let av1c = &av01.av1c;

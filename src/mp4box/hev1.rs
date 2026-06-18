@@ -50,7 +50,7 @@ impl Hev1Box {
             vertresolution: FixedPointU16::new(0x48),
             frame_count: 1,
             depth: 0x0018,
-            hvcc: HvcCBox::new(),
+            hvcc: config.hvcc.clone(),
             sinf: Vec::new(),
         }
     }
@@ -202,7 +202,7 @@ impl<W: Write> WriteBox<&mut W> for Hev1Box {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct HvcCBox {
     pub configuration_version: u8,
     pub general_profile_space: u8,
@@ -224,11 +224,27 @@ pub struct HvcCBox {
     pub arrays: Vec<HvcCArray>,
 }
 
-impl HvcCBox {
-    pub fn new() -> Self {
+impl Default for HvcCBox {
+    fn default() -> Self {
         Self {
             configuration_version: 1,
-            ..Default::default()
+            general_profile_space: 0,
+            general_tier_flag: false,
+            general_profile_idc: 0,
+            general_profile_compatibility_flags: 0,
+            general_constraint_indicator_flag: 0,
+            general_level_idc: 0,
+            min_spatial_segmentation_idc: 0,
+            parallelism_type: 0,
+            chroma_format_idc: 0,
+            bit_depth_luma_minus8: 0,
+            bit_depth_chroma_minus8: 0,
+            avg_frame_rate: 0,
+            constant_frame_rate: 0,
+            num_temporal_layers: 0,
+            temporal_id_nested: false,
+            length_size_minus_one: 0,
+            arrays: Vec::new(),
         }
     }
 }
@@ -292,8 +308,8 @@ impl<R: Read + Seek> ReadBox<&mut R> for HvcCBox {
     fn read_box(reader: &mut R, _size: u64, _context: &mut Mp4Context) -> Result<Self> {
         let configuration_version = reader.read_u8()?;
         let params = reader.read_u8()?;
-        let general_profile_space = params & 0b11000000 >> 6;
-        let general_tier_flag = (params & 0b00100000 >> 5) > 0;
+        let general_profile_space = (params & 0b11000000) >> 6;
+        let general_tier_flag = ((params & 0b00100000) >> 5) > 0;
         let general_profile_idc = params & 0b00011111;
 
         let general_profile_compatibility_flags = reader.read_u32::<BigEndian>()?;
@@ -307,9 +323,9 @@ impl<R: Read + Seek> ReadBox<&mut R> for HvcCBox {
         let avg_frame_rate = reader.read_u16::<BigEndian>()?;
 
         let params = reader.read_u8()?;
-        let constant_frame_rate = params & 0b11000000 >> 6;
-        let num_temporal_layers = params & 0b00111000 >> 3;
-        let temporal_id_nested = (params & 0b00000100 >> 2) > 0;
+        let constant_frame_rate = (params & 0b11000000) >> 6;
+        let num_temporal_layers = (params & 0b00111000) >> 3;
+        let temporal_id_nested = ((params & 0b00000100) >> 2) > 0;
         let length_size_minus_one = params & 0b000011;
 
         let num_of_arrays = reader.read_u8()?;
@@ -374,11 +390,13 @@ impl<W: Write> WriteBox<&mut W> for HvcCBox {
         writer.write_u48::<BigEndian>(self.general_constraint_indicator_flag)?;
         writer.write_u8(self.general_level_idc)?;
 
-        writer.write_u16::<BigEndian>(self.min_spatial_segmentation_idc & 0x0FFF)?;
-        writer.write_u8(self.parallelism_type & 0b11)?;
-        writer.write_u8(self.chroma_format_idc & 0b11)?;
-        writer.write_u8(self.bit_depth_luma_minus8 & 0b111)?;
-        writer.write_u8(self.bit_depth_chroma_minus8 & 0b111)?;
+        // The high bits of each of these fields are `reserved` and ISO/IEC 14496-15
+        // §8.3.3.1.2 requires them to be all-1s, not 0. The reader masks them back off.
+        writer.write_u16::<BigEndian>(0xF000 | (self.min_spatial_segmentation_idc & 0x0FFF))?;
+        writer.write_u8(0b1111_1100 | (self.parallelism_type & 0b11))?;
+        writer.write_u8(0b1111_1100 | (self.chroma_format_idc & 0b11))?;
+        writer.write_u8(0b1111_1000 | (self.bit_depth_luma_minus8 & 0b111))?;
+        writer.write_u8(0b1111_1000 | (self.bit_depth_chroma_minus8 & 0b111))?;
         writer.write_u16::<BigEndian>(self.avg_frame_rate)?;
 
         let constant_frame_rate = (self.constant_frame_rate & 0b11) << 6;
@@ -437,6 +455,67 @@ mod tests {
         let dst_box =
             Hev1Box::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
         assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_hvcc_bitfields_roundtrip() {
+        // Exercises the packed bit-fields (profile_space/tier_flag/constant_frame_rate/
+        // num_temporal_layers/temporal_id_nested) with non-zero values, which the
+        // all-zero roundtrip in test_hev1 does not cover.
+        // Values chosen so each packed field's high bits differ from the low bits
+        // of its containing byte, so a masked-vs-shifted precedence bug in read_box
+        // changes the decoded value and this roundtrip fails.
+        let src_box = HvcCBox {
+            configuration_version: 1,
+            general_profile_space: 0b10,
+            general_tier_flag: false,
+            general_profile_idc: 0b00001,
+            general_constraint_indicator_flag: 0,
+            constant_frame_rate: 0b10,
+            num_temporal_layers: 0b100,
+            temporal_id_nested: false,
+            length_size_minus_one: 0b01,
+            ..Default::default()
+        };
+
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+        assert_eq!(buf.len(), src_box.box_size() as usize);
+
+        let mut reader = Cursor::new(&buf);
+        let header = BoxHeader::read(&mut reader).unwrap();
+        assert_eq!(header.name, BoxType::HvcCBox);
+
+        let dst_box =
+            HvcCBox::read_box(&mut reader, header.size, &mut Mp4Context::default()).unwrap();
+        assert_eq!(src_box, dst_box);
+    }
+
+    #[test]
+    fn test_hvcc_writes_reserved_bits_as_ones() {
+        // ISO/IEC 14496-15 §8.3.3.1.2: the reserved high bits of these five fields must be
+        // all-1s. Use low-bit values that don't themselves set the reserved bits, so the
+        // assertion only passes if the writer ORs the reserved 1s in.
+        let src_box = HvcCBox {
+            configuration_version: 1,
+            min_spatial_segmentation_idc: 0x0123,
+            parallelism_type: 0b10,
+            chroma_format_idc: 0b01,
+            bit_depth_luma_minus8: 0b000,
+            bit_depth_chroma_minus8: 0b010,
+            ..Default::default()
+        };
+
+        let mut buf = Vec::new();
+        src_box.write_box(&mut buf).unwrap();
+
+        // Offsets are after the 8-byte box header:
+        // version(1) + profile byte(1) + compat(4) + constraint(6) + level(1) = 13 -> +8 = 21.
+        assert_eq!(
+            &buf[21..27],
+            // 0xF000|0x0123, 0b111111|10, 0b111111|01, 0b11111|000, 0b11111|010
+            &[0xF1, 0x23, 0xFE, 0xFD, 0xF8, 0xFA],
+        );
     }
 
     #[test]
