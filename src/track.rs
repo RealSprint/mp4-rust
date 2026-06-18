@@ -802,6 +802,10 @@ impl Mp4Track {
         reader: &mut R,
         sample_id: u32,
     ) -> Result<Option<Mp4Sample>> {
+        // Sample ids are 1-based.
+        if sample_id == 0 {
+            return Ok(None);
+        }
         let sample_offset = match self.sample_offset(sample_id) {
             Ok(offset) => offset,
             Err(Error::EntryInStblNotFound(_, _, _)) => return Ok(None),
@@ -817,7 +821,11 @@ impl Mp4Track {
         reader.seek(SeekFrom::Start(sample_offset))?;
         reader.read_exact(&mut buffer)?;
 
-        let (start_time, duration) = self.sample_time(sample_id).unwrap(); // XXX
+        let (start_time, duration) = match self.sample_time(sample_id) {
+            Ok(t) => t,
+            Err(Error::EntryInStblNotFound(_, _, _)) => return Ok(None),
+            Err(err) => return Err(err),
+        };
         let rendering_offset = self.sample_rendering_offset(sample_id);
         let is_sync = self.is_sync_sample(sample_id);
 

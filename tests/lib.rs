@@ -213,4 +213,7 @@ fn test_read_fragments() {
     );
     let eos = mp4_fragment.read_sample(1, 2);
     assert!(eos.is_err());
+
+    // Sample ids are 1-based; reading sample 0 must not panic.
+    assert!(mp4_fragment.read_sample(1, 0).unwrap().is_none());
 }
