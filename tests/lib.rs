@@ -214,8 +214,6 @@ fn test_read_fragments() {
     let eos = mp4_fragment.read_sample(1, 2);
     assert!(eos.is_err());
 
-    // sample_id is 1-based; reading sample 0 must not panic. Without the guard
-    // this underflows `sample_id - 1` in the fragment sample lookup (a panic
-    // under debug overflow checks).
+    // Sample ids are 1-based; reading sample 0 must not panic.
     assert!(mp4_fragment.read_sample(1, 0).unwrap().is_none());
 }

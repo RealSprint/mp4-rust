@@ -808,8 +808,7 @@ impl Mp4Track {
         reader: &mut R,
         sample_id: u32,
     ) -> Result<Option<Mp4Sample>> {
-        // Sample IDs are 1-based; sample_id 0 would underflow `sample_id - 1`
-        // in the offset/time lookups below.
+        // Sample ids are 1-based.
         if sample_id == 0 {
             return Ok(None);
         }
