@@ -147,6 +147,8 @@ pub struct CmafChunkWriter<W> {
     mfhd: MfhdBox,
     prft: Option<PrftBox>,
     styp: StypBox,
+    styp_on_boundaries_only: bool,
+    opens_fragment: bool,
     emsgs: Vec<EmsgBox>,
     samples: Vec<Bytes>,
     timescale: u32,
@@ -207,6 +209,8 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
                 minor_version: cmaf_header_config.minor_version,
                 compatible_brands,
             }),
+            styp_on_boundaries_only: false,
+            opens_fragment: false,
             emsgs: vec![],
             samples: vec![],
             timescale: config.timescale,
@@ -338,7 +342,9 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
     }
 
     pub fn write_end(&mut self, sequence_number: u32) -> Result<()> {
-        self.styp.write_box(&mut self.writer)?;
+        if !self.styp_on_boundaries_only || self.opens_fragment {
+            self.styp.write_box(&mut self.writer)?;
+        }
 
         self.mfhd.sequence_number = sequence_number;
 
@@ -382,10 +388,20 @@ impl<W: Write + Seek> CmafChunkWriter<W> {
 
     pub fn mark_new_fragment(&mut self) {
         self.styp.0.compatible_brands.push(CMAF_FRAGMENT_IDENTIFIER);
+        self.opens_fragment = true;
     }
 
     pub fn mark_new_segment(&mut self) {
         self.styp.0.compatible_brands.push(CMAF_SEGMENT_IDENTIFIER);
+        self.opens_fragment = true;
+    }
+
+    /// Writes `styp` only on chunks marked as opening a fragment or segment.
+    ///
+    /// `styp` is optional before `moof` (ISO/IEC 14496-12 8.16.2), and its
+    /// `cmff`/`cmfs` brands only carry information at those boundaries.
+    pub fn styp_on_boundaries_only(&mut self) {
+        self.styp_on_boundaries_only = true;
     }
 }
 
@@ -485,6 +501,87 @@ mod tests {
         let size = data.len() as u64;
 
         Mp4Reader::read_header(Cursor::new(data), size)?;
+
+        Ok(())
+    }
+
+    fn write_chunk(
+        configure: impl FnOnce(&mut CmafChunkWriter<Cursor<Vec<u8>>>),
+    ) -> Result<Vec<u8>> {
+        let config = CmafChunkConfig {
+            timescale: 1000,
+            default_sample_duration: 10,
+            default_sample_size: 7,
+            default_sample_flags: 0,
+            producer_reference_time: None,
+        };
+        let header_config = CmafHeaderConfig {
+            compatible_brands: vec![str::parse("cmfc").unwrap()],
+            major_brand: str::parse("cmf2").unwrap(),
+            minor_version: 0,
+            timescale: 1000,
+            pssh: Vec::new(),
+        };
+
+        let mut writer =
+            CmafChunkWriter::write_start(Cursor::new(Vec::new()), 1, &config, header_config)?;
+        configure(&mut writer);
+        writer.write_sample(&Mp4Sample {
+            start_time: 0,
+            duration: 10,
+            rendering_offset: 0,
+            is_sync: true,
+            bytes: Bytes::from_static(&[0; 7]),
+            encryption: None,
+        })?;
+        writer.write_end(1)?;
+
+        Ok(writer.into_writer().into_inner())
+    }
+
+    fn first_box_type(data: &[u8]) -> &[u8] {
+        &data[4..8]
+    }
+
+    fn contains(data: &[u8], needle: &[u8]) -> bool {
+        data.windows(needle.len()).any(|window| window == needle)
+    }
+
+    #[test]
+    fn styp_is_written_on_every_chunk_by_default() -> Result<()> {
+        let data = write_chunk(|_| {})?;
+
+        assert_eq!(first_box_type(&data), b"styp");
+        assert!(contains(&data, b"cmfl"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn styp_on_boundaries_only_skips_plain_chunks() -> Result<()> {
+        let data = write_chunk(|writer| writer.styp_on_boundaries_only())?;
+
+        assert_eq!(first_box_type(&data), b"moof");
+        assert!(!contains(&data, b"styp"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn styp_on_boundaries_only_keeps_fragment_and_segment_starts() -> Result<()> {
+        let fragment = write_chunk(|writer| {
+            writer.styp_on_boundaries_only();
+            writer.mark_new_fragment();
+        })?;
+        let segment = write_chunk(|writer| {
+            writer.styp_on_boundaries_only();
+            writer.mark_new_segment();
+        })?;
+
+        assert_eq!(first_box_type(&fragment), b"styp");
+        assert!(contains(&fragment, b"cmff"));
+        assert_eq!(first_box_type(&segment), b"styp");
+        assert!(contains(&segment, b"cmfs"));
 
         Ok(())
     }
